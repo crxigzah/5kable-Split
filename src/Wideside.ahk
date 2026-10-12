@@ -8,7 +8,7 @@
 ;@Ahk2Exe-SetName Wideside
 ;@Ahk2Exe-SetProductName Wideside
 ;@Ahk2Exe-SetDescription Wideside
-;@Ahk2Exe-SetVersion 1.6.0
+;@Ahk2Exe-SetVersion 1.5.0
 ;@Ahk2Exe-SetCompanyName Wideside
 ;@Ahk2Exe-SetCopyright Copyright 2026 Wideside
 ;@Ahk2Exe-SetOrigFilename Wideside.exe
@@ -24,7 +24,7 @@ DllCall("SetThreadDpiAwarenessContext", "ptr", -4, "ptr")
 CoordMode "Mouse", "Screen"
 
 global AppName := "Wideside"
-global AppVersion := "1.6.0"
+global AppVersion := "1.5.0"
 global AppUrl := "https://crxigzah.github.io/wideside/"
 
 ; Settings live in %AppData% so it works when installed to Program Files.
@@ -54,7 +54,6 @@ global Gap := 0
 global RequireShift := false
 global PauseWinSnap := true
 global RememberApps := true
-global SameZoneFree := true     ; moving within the starting zone doesn't snap
 global CheckUpdates := true
 global Paused := false
 global LatestVersion := ""      ; set when a newer release is found
@@ -144,8 +143,6 @@ Gap=0
 RequireShift=0
 ; 1 = turn off Windows' own Snap while Wideside is running
 PauseWindowsSnap=1
-; 1 = moving a window around inside its own zone doesn't snap (hold Shift to snap)
-FreeInSameZone=1
 ; 1 = apps reopen in the zone they were last snapped to
 RememberAppZones=1
 ; 1 = check GitHub for new versions every few hours
@@ -163,7 +160,7 @@ SettingsVersion=2
 }
 
 LoadSettings() {
-    global Layouts, LayoutIndex, Gap, RequireShift, PauseWinSnap, RememberApps, CheckUpdates, SameZoneFree
+    global Layouts, LayoutIndex, Gap, RequireShift, PauseWinSnap, RememberApps, CheckUpdates
     Layouts := BuiltInLayouts.Clone()
 
     try {
@@ -185,7 +182,6 @@ LoadSettings() {
     RequireShift := ReadInt("RequireShift", 0) != 0
     PauseWinSnap := ReadInt("PauseWindowsSnap", 1) != 0
     RememberApps := ReadInt("RememberAppZones", 1) != 0
-    SameZoneFree := ReadInt("FreeInSameZone", 1) != 0
     CheckUpdates := ReadInt("CheckForUpdates", 1) != 0
     ; Settings saved before 1.4 switch to Easy Arrange behaviour: zones on
     ; every drag and no gap
@@ -206,7 +202,6 @@ SaveSettings() {
     IniWrite RequireShift ? 1 : 0, IniFile, "Settings", "RequireShift"
     IniWrite PauseWinSnap ? 1 : 0, IniFile, "Settings", "PauseWindowsSnap"
     IniWrite RememberApps ? 1 : 0, IniFile, "Settings", "RememberAppZones"
-    IniWrite SameZoneFree ? 1 : 0, IniFile, "Settings", "FreeInSameZone"
     IniWrite CheckUpdates ? 1 : 0, IniFile, "Settings", "CheckForUpdates"
     IniWrite 2, IniFile, "Settings", "SettingsVersion"
 }
@@ -492,9 +487,7 @@ OnMoveSize(hHook, event, hwnd, idObject, idChild, idThread, time) {
 BeginDrag(hwnd, viaMouse) {
     global Drag
     MouseGetPos &x, &y
-    smon := MonitorFromPoint(x, y)
-    Drag := {hwnd: hwnd, sx: x, sy: y, shown: false, sel: [], mon: 0, viaMouse: viaMouse
-        , armed: false, smon: smon, szone: ZoneAtPoint(smon, x, y)}
+    Drag := {hwnd: hwnd, sx: x, sy: y, shown: false, sel: [], mon: 0, viaMouse: viaMouse}
     SetTimer DragTick, 15
 }
 
@@ -534,21 +527,8 @@ DragTick() {
         HideOverlay()
         return
     }
-    mon := MonitorFromPoint(mx, my)
-    ; Moving around inside the zone the drag started in is free. The zones
-    ; wake up once the cursor crosses into another zone (or Shift is held)
-    ; and then stay up for the rest of the drag.
-    if !Drag.armed {
-        if !SameZoneFree || A_TickCount - LastShift <= 250 || mon != Drag.smon
-            || ZoneAtPoint(mon, mx, my) != Drag.szone
-            Drag.armed := true
-        else {
-            Drag.sel := []
-            HideOverlay()
-            return
-        }
-    }
     Drag.shown := true
+    mon := MonitorFromPoint(mx, my)
     sel := ZonesAtPoint(mon, mx, my)
     ShowOverlay(mon, sel)
     Drag.sel := sel, Drag.mon := mon
@@ -748,12 +728,6 @@ TogglePause(*) {
     SetTimer () => ToolTip(), -1200
 }
 
-SetSameZoneFree(on) {
-    global SameZoneFree
-    SameZoneFree := on
-    SaveSettings()
-}
-
 SetRememberApps(on) {
     global RememberApps
     RememberApps := on
@@ -903,14 +877,13 @@ ShowAbout(welcome := false, *) {
     y := 108
     if welcome {
         g.SetFont("s10 c" C_Text)
-        g.AddText("x24 y" y " w" (W - 24), "Wideside is running in your system tray (bottom right, next to the clock). Drag a window into another zone and drop it to snap.")
+        g.AddText("x24 y" y " w" (W - 24), "Wideside is running in your system tray (bottom right, next to the clock). Drag any window and drop it on a zone.")
         y += 60
     }
 
     keys := [
         ["Drag a window",      "Show zones, drop to snap"],
         ["Drop on a line",     "Span both zones"],
-        ["Shift + drag",       "Snap within the same zone"],
         ["Ctrl + drag",        "Move freely, no snapping"],
         ["Win+Alt+Left/Right", "Previous / next zone"],
         ["Win+Alt+1 to 9",     "Snap to zone number"],
@@ -1002,12 +975,11 @@ ShowSettings(*) {
     y += 68
     AddToggle(g, y, "Only show zones while holding Shift", RequireShift, SetRequireShift)
     AddToggle(g, y + 28, "Turn off Windows Snap while Wideside runs", PauseWinSnap, SetPauseWinSnap)
-    AddToggle(g, y + 56, "Move freely inside a window's own zone (Shift snaps)", SameZoneFree, SetSameZoneFree)
-    AddToggle(g, y + 84, "Reopen apps in the zone they were last snapped to", RememberApps, SetRememberApps)
-    AddToggle(g, y + 112, "Check for updates automatically", CheckUpdates, SetCheckUpdates)
-    AddToggle(g, y + 140, "Start Wideside with Windows", FileExist(StartupLink()) != "", SetStartup)
+    AddToggle(g, y + 56, "Reopen apps in the zone they were last snapped to", RememberApps, SetRememberApps)
+    AddToggle(g, y + 84, "Check for updates automatically", CheckUpdates, SetCheckUpdates)
+    AddToggle(g, y + 112, "Start Wideside with Windows", FileExist(StartupLink()) != "", SetStartup)
 
-    y += 184
+    y += 156
     g.SetFont("s9 c" C_Accent)
     custom := g.AddText("x24 y" (y + 8) " w220", "Edit custom layouts...")
     custom.OnEvent("Click", EditCustomLayouts)

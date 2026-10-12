@@ -10,8 +10,7 @@ Wideside was made for the MSI MAG C42CQR E2, but it works on any monitor. It rea
 
 | Action | What it does |
 |---|---|
-| Drag a window into another zone | Shows the zones. The one under the mouse lights up orange; let go to snap. Moving a window around inside its own zone doesn't snap. |
-| **Shift** + drag | Shows the zones straight away, to snap within the same zone |
+| Drag a window | Shows the zones. The one under the mouse lights up orange; let go to snap. |
 | Drop on the line between zones | Spans both zones (all four near a corner where four meet) |
 | **Ctrl** + drag | Moves the window freely without snapping |
 | Pull a browser tab off the tab bar | Same as above: drop it on a zone and the tab becomes its own window in that zone (Chrome, Edge, Opera, Brave). |
