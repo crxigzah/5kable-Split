@@ -17,6 +17,10 @@ $Version = [regex]::Match((Get-Content $Src -Raw), 'AppVersion := "([^"]+)"').Gr
 if (-not $Version) { throw 'Could not read AppVersion from src\5kableSplit.ahk' }
 Write-Host "Building 5kable Split $Version" -ForegroundColor Cyan
 
+# GitHub API headers; a token (set automatically in GitHub Actions) avoids rate limits
+$GhHeaders = @{ 'User-Agent' = '5kable-Split-build' }
+if ($env:GITHUB_TOKEN) { $GhHeaders['Authorization'] = "Bearer $env:GITHUB_TOKEN" }
+
 function Get-Zip($Url, $Dest) {
     $zip = Join-Path $Tools 'download.zip'
     Invoke-WebRequest $Url -OutFile $zip -UseBasicParsing
@@ -33,8 +37,14 @@ function Find-File($Dir, $Name) {
 $AhkDir = Join-Path $Tools 'ahk'
 $AhkBase = Find-File $AhkDir 'AutoHotkey64.exe'
 if (-not $AhkBase) {
+    # From GitHub rather than autohotkey.com, which puts a Cloudflare bot
+    # check in front of downloads from CI machines
     Write-Host 'Downloading AutoHotkey v2...'
-    Get-Zip 'https://www.autohotkey.com/download/ahk-v2.zip' $AhkDir
+    $rels = Invoke-RestMethod 'https://api.github.com/repos/AutoHotkey/AutoHotkey/releases?per_page=30' -Headers $GhHeaders
+    $asset = $rels | Where-Object { -not $_.prerelease } | ForEach-Object { $_.assets } |
+        Where-Object { $_.name -match '^AutoHotkey.*v?2\.\d.*\.zip$' } | Select-Object -First 1
+    if (-not $asset) { throw 'No AutoHotkey v2 zip found on GitHub releases' }
+    Get-Zip $asset.browser_download_url $AhkDir
     $AhkBase = Find-File $AhkDir 'AutoHotkey64.exe'
     if (-not $AhkBase) { throw 'AutoHotkey64.exe not found in the AutoHotkey download' }
 }
@@ -44,7 +54,7 @@ $A2EDir = Join-Path $Tools 'Ahk2Exe'
 $Ahk2Exe = Find-File $A2EDir 'Ahk2Exe.exe'
 if (-not $Ahk2Exe) {
     Write-Host 'Downloading Ahk2Exe...'
-    $rel = Invoke-RestMethod 'https://api.github.com/repos/AutoHotkey/Ahk2Exe/releases/latest' -Headers @{ 'User-Agent' = '5kable-Split-build' }
+    $rel = Invoke-RestMethod 'https://api.github.com/repos/AutoHotkey/Ahk2Exe/releases/latest' -Headers $GhHeaders
     $asset = $rel.assets | Where-Object { $_.name -like '*.zip' } | Select-Object -First 1
     if (-not $asset) { throw 'No Ahk2Exe zip found on the latest GitHub release' }
     Get-Zip $asset.browser_download_url $A2EDir
