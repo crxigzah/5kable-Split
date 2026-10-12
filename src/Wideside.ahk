@@ -8,7 +8,7 @@
 ;@Ahk2Exe-SetName Wideside
 ;@Ahk2Exe-SetProductName Wideside
 ;@Ahk2Exe-SetDescription Wideside
-;@Ahk2Exe-SetVersion 1.1.0
+;@Ahk2Exe-SetVersion 1.2.0
 ;@Ahk2Exe-SetCompanyName Wideside
 ;@Ahk2Exe-SetCopyright Copyright 2026 Wideside
 ;@Ahk2Exe-SetOrigFilename Wideside.exe
@@ -24,7 +24,7 @@ DllCall("SetThreadDpiAwarenessContext", "ptr", -4, "ptr")
 CoordMode "Mouse", "Screen"
 
 global AppName := "Wideside"
-global AppVersion := "1.1.0"
+global AppVersion := "1.2.0"
 global AppUrl := "https://crxigzah.github.io/wideside/"
 
 ; Settings live in %AppData% so it works when installed to Program Files.
@@ -56,6 +56,7 @@ global ZoneOf := Map()          ; hwnd -> {idx, x, y, w, h} of the last snap
 
 global Overlays := [], OverlayMon := 0, OverlayHi := -1
 global DragHwnd := 0, DragZone := 0, DragMon := 0, DragW := 0, DragH := 0
+global MouseDrag := false, WatchHwnd := 0, WatchX := 0, WatchY := 0
 global SettingsGui := 0, AboutGui := 0
 
 ; ---------------------------------------------------------------- startup
@@ -90,6 +91,30 @@ else
 #!Up::    MaximiseActive()
 #!l::     NextLayout()
 #!z::     PreviewZones()
+
+; Track the left mouse button so drags that apps run themselves (see
+; WatchMouseDrag) can snap too. ~ lets the click through as normal.
+~LButton:: {
+    global MouseDrag, WatchHwnd
+    MouseDrag := false, WatchHwnd := 0
+    SetTimer WatchMouseDrag, 30
+}
+
+~LButton Up:: {
+    global MouseDrag, DragHwnd
+    SetTimer WatchMouseDrag, 0
+    if !MouseDrag
+        return
+    MouseDrag := false
+    SetTimer DragTick, 0
+    hwnd := DragHwnd, zone := DragZone, mon := DragMon
+    DragHwnd := 0
+    HideOverlay()
+    ; Slightly longer delay than a title-bar drag: browsers finish placing a
+    ; torn-off tab's window just after the button comes up.
+    if zone && (!RequireShift || GetKeyState("Shift", "P"))
+        SetTimer () => SnapToZone(hwnd, mon, zone), -80
+}
 
 ; ---------------------------------------------------------------- settings
 
@@ -292,12 +317,13 @@ MaximiseActive() {
 ; ---------------------------------------------------------------- drag to snap
 
 OnMoveSize(hHook, event, hwnd, idObject, idChild, idThread, time) {
-    global DragHwnd, DragZone, DragMon, DragW, DragH
+    global DragHwnd, DragZone, DragMon, DragW, DragH, MouseDrag
     if idObject != 0
         return
     if event = 0x000A {
         if !IsSnappable(hwnd)
             return
+        MouseDrag := false   ; a normal title-bar drag takes over
         DragHwnd := hwnd, DragZone := 0, DragMon := 0
         try WinGetPos , , &DragW, &DragH, hwnd
         SetTimer DragTick, 25
@@ -332,6 +358,30 @@ DragTick() {
     zone := ZoneAtPoint(mon, mx, my)
     ShowOverlay(mon, zone)
     DragZone := zone, DragMon := mon
+}
+
+; Chrome, Edge and Opera move a torn-off tab's new window themselves instead
+; of using a normal title-bar drag, so no move event fires. Spot those by
+; watching the active window move while the mouse button is held.
+WatchMouseDrag() {
+    global MouseDrag, WatchHwnd, WatchX, WatchY, DragHwnd, DragZone, DragMon, DragW, DragH
+    if MouseDrag || DragHwnd   ; already tracking this drag
+        return
+    win := WinExist("A")
+    if !IsSnappable(win)
+        return
+    try WinGetPos &x, &y, &w, &h, win
+    catch
+        return
+    if win != WatchHwnd {      ; new active window (e.g. the torn-off tab) - start watching it
+        WatchHwnd := win, WatchX := x, WatchY := y
+        return
+    }
+    if x != WatchX || y != WatchY {
+        MouseDrag := true
+        DragHwnd := win, DragZone := 0, DragMon := 0, DragW := w, DragH := h
+        SetTimer DragTick, 25
+    }
 }
 
 ; ---------------------------------------------------------------- overlay

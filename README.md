@@ -11,6 +11,7 @@ Wideside was made for the MSI MAG C42CQR E2, but it works on any monitor. It rea
 | Action | What it does |
 |---|---|
 | Hold **Shift** while dragging a window | Shows the zones. The one under the mouse lights up orange; let go to snap. |
+| Pull a browser tab off the tab bar, then hold **Shift** | Same as above: drop it on a zone and the tab becomes its own window in that zone (Chrome, Edge, Opera, Brave). |
 | **Win+Alt+Left / Right** | Moves the active window to the previous / next zone |
 | **Win+Alt+1 to 9** | Moves the active window to that zone number |
 | **Win+Alt+Up** | Maximises across the whole monitor |
