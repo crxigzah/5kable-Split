@@ -64,10 +64,4 @@ build.cmd / build.ps1     one-click build
 - Windows still sees **one** monitor, same as Easy Arrange. Maximise, full-screen games and full-screen video use the whole panel.
 - Apps running as admin (Task Manager, some installers) can't be moved unless Wideside also runs as admin.
 - Some apps have a minimum width and won't shrink fully into a narrow zone.
-- Until code signing is set up (see below), SmartScreen shows "Windows protected your PC" the first time someone runs the installer. Click **More info > Run anyway**.
-
-## License and code signing
-
-Wideside is released under the [MIT License](LICENSE). Third-party components in the release builds are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
-
-Windows releases are to be signed through the SignPath Foundation's free programme for open-source projects. See the [code signing policy](https://crxigzah.github.io/wideside/code-signing.html).
+- The exe isn't code-signed, so SmartScreen shows "Windows protected your PC" the first time someone runs the installer. Click **More info > Run anyway**.
