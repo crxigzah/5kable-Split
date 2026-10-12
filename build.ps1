@@ -64,8 +64,11 @@ if (-not $Ahk2Exe) {
 
 # 3. Check the script for syntax / load-time errors (Ahk2Exe doesn't)
 Write-Host 'Validating script...'
-$check = & $AhkBase /ErrorStdOut /Validate $Src 2>&1 | Out-String
-if ($LASTEXITCODE -ne 0) { throw "Script has errors:`n$check" }
+$errLog = Join-Path $Tools 'validate.log'
+$v = Start-Process $AhkBase -Wait -PassThru -NoNewWindow -RedirectStandardError $errLog `
+    -ArgumentList @('/ErrorStdOut', '/Validate', "`"$Src`"")
+Write-Host "  exit code $($v.ExitCode)"
+if ($v.ExitCode -ne 0) { throw "Script has errors:`n$(Get-Content $errLog -Raw)" }
 
 # 4. Compile the exe (icon and version info come from the ;@Ahk2Exe lines in the script)
 $Exe = Join-Path $Dist '5kableSplit.exe'
