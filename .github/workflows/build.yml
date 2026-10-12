@@ -1,0 +1,37 @@
+# Builds the exe, portable zip and installer on a Windows runner.
+# Run it from the Actions tab, or push a tag like v1.0.1 to also attach the
+# files to a GitHub release.
+name: Build
+
+on:
+  workflow_dispatch:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        shell: pwsh
+        run: ./build.ps1
+      # Fixed-name copies so https://5kable.net/split can always link to
+      # releases/latest/download/<name> without knowing the version
+      - name: Add latest-version aliases
+        shell: pwsh
+        run: |
+          Copy-Item (Get-ChildItem dist/5kableSplit-Setup-*.exe).FullName dist/5kableSplit-Setup.exe
+          Copy-Item (Get-ChildItem dist/5kableSplit-*-portable.zip).FullName dist/5kableSplit-portable.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 5kable-Split
+          path: dist/*
+      - name: Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
