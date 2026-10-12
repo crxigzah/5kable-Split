@@ -8,7 +8,7 @@
 ;@Ahk2Exe-SetName Wideside
 ;@Ahk2Exe-SetProductName Wideside
 ;@Ahk2Exe-SetDescription Wideside
-;@Ahk2Exe-SetVersion 1.2.0
+;@Ahk2Exe-SetVersion 1.3.0
 ;@Ahk2Exe-SetCompanyName Wideside
 ;@Ahk2Exe-SetCopyright Copyright 2026 Wideside
 ;@Ahk2Exe-SetOrigFilename Wideside.exe
@@ -24,7 +24,7 @@ DllCall("SetThreadDpiAwarenessContext", "ptr", -4, "ptr")
 CoordMode "Mouse", "Screen"
 
 global AppName := "Wideside"
-global AppVersion := "1.2.0"
+global AppVersion := "1.3.0"
 global AppUrl := "https://crxigzah.github.io/wideside/"
 
 ; Settings live in %AppData% so it works when installed to Program Files.
@@ -54,7 +54,7 @@ global Gap := 8
 global RequireShift := true
 global ZoneOf := Map()          ; hwnd -> {idx, x, y, w, h} of the last snap
 
-global Overlays := [], OverlayMon := 0, OverlayHi := -1
+global Overlays := [], OverlayMon := 0, OverlayHi := -1, HotFill := 0
 global DragHwnd := 0, DragZone := 0, DragMon := 0, DragW := 0, DragH := 0
 global MouseDrag := false, WatchHwnd := 0, WatchX := 0, WatchY := 0
 global SettingsGui := 0, AboutGui := 0
@@ -386,37 +386,63 @@ WatchMouseDrag() {
 
 ; ---------------------------------------------------------------- overlay
 
+; Easy Arrange style: each zone is an orange outline with a number tag. The
+; zone under the mouse gets a thicker outline and a light orange tint.
 ShowOverlay(mon, hi) {
-    global Overlays, OverlayMon, OverlayHi
+    global Overlays, OverlayMon, OverlayHi, HotFill
     if mon != OverlayMon || !Overlays.Length {
         HideOverlay()
+        HotFill := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x20 -DPIScale")
+        HotFill.BackColor := C_Accent
         for i, z in CurrentZones() {
             r := ZoneRect(mon, z)
+            ; The key colour is made fully transparent, so only the outline
+            ; and number tag are drawn
             g := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x20 -DPIScale")
-            g.BackColor := C_Card
-            g.SetFont("s48 bold c" C_Accent, "Segoe UI")
-            label := g.AddText("x0 y" (r.h // 2 - 45) " w" r.w " h90 Center BackgroundTrans", i)
+            g.BackColor := "010203"
+            lines := []
+            Loop 4
+                lines.Push(g.AddText("x0 y0 w1 h1 Background" C_Accent))
+            g.SetFont("s11 bold c" C_Bg, "Segoe UI")
+            g.AddText("x14 y14 w30 h30 Center +0x200 Background" C_Accent, i)
             g.Show("NA x" r.x " y" r.y " w" r.w " h" r.h)
-            WinSetTransparent 150, g
-            Overlays.Push({gui: g, label: label})
+            WinSetTransColor "010203 235", g
+            o := {gui: g, lines: lines, w: r.w, h: r.h, rect: r}
+            SetZoneFrame(o, false)
+            Overlays.Push(o)
         }
         OverlayMon := mon, OverlayHi := -1
     }
     if hi != OverlayHi {
-        for i, o in Overlays {
-            o.gui.BackColor := (i = hi) ? C_Accent : C_Card
-            o.label.SetFont("c" ((i = hi) ? C_Bg : C_Accent))
-            WinRedraw o.gui
-        }
+        for i, o in Overlays
+            SetZoneFrame(o, i = hi)
+        if hi >= 1 && hi <= Overlays.Length {
+            r := Overlays[hi].rect
+            HotFill.Show("NA x" r.x " y" r.y " w" r.w " h" r.h)
+            WinSetTransparent 45, HotFill
+        } else
+            HotFill.Hide()
         OverlayHi := hi
     }
 }
 
+SetZoneFrame(o, hot) {
+    t := hot ? 6 : 2
+    o.lines[1].Move(0, 0, o.w, t)
+    o.lines[2].Move(0, o.h - t, o.w, t)
+    o.lines[3].Move(0, 0, t, o.h)
+    o.lines[4].Move(o.w - t, 0, t, o.h)
+    for l in o.lines
+        l.Redraw()
+}
+
 HideOverlay(*) {
-    global Overlays, OverlayMon, OverlayHi
+    global Overlays, OverlayMon, OverlayHi, HotFill
     for o in Overlays
         o.gui.Destroy()
-    Overlays := [], OverlayMon := 0, OverlayHi := -1
+    if HotFill
+        HotFill.Destroy()
+    Overlays := [], OverlayMon := 0, OverlayHi := -1, HotFill := 0
 }
 
 PreviewZones(*) {
