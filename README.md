@@ -2,7 +2,7 @@
 
 <h1 align="center">Wideside</h1>
 <p align="center">One big monitor, perfectly split. Snap windows into side-by-side zones on ultrawide and large monitors, like Dell Easy Arrange.</p>
-<p align="center"><a href="https://crxigzah.github.io/wideside/"><b>Website and download</b></a></p>
+<p align="center"><a href="https://crxigzah.github.io/wideside/"><b>Website and download</b></a> · <a href="https://crxigzah.github.io/wideside/guide.html"><b>User guide</b></a></p>
 
 Wideside was made for the MSI MAG C42CQR E2, but it works on any monitor. It reads the resolution, scaling and taskbar position from Windows.
 

@@ -49,9 +49,11 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "..\dist\{#AppExe}"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\docs\guide.html"; DestDir: "{app}"; DestName: "Wideside Guide.html"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExe}"
+Name: "{group}\{#AppName} Guide"; Filename: "{app}\Wideside Guide.html"
 Name: "{group}\Uninstall {#AppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 ; Same name the app uses for its own "Start with Windows" toggle, so the two stay in sync

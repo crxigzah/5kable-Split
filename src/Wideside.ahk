@@ -8,7 +8,7 @@
 ;@Ahk2Exe-SetName Wideside
 ;@Ahk2Exe-SetProductName Wideside
 ;@Ahk2Exe-SetDescription Wideside
-;@Ahk2Exe-SetVersion 1.5.0
+;@Ahk2Exe-SetVersion 1.6.1
 ;@Ahk2Exe-SetCompanyName Wideside
 ;@Ahk2Exe-SetCopyright Copyright 2026 Wideside
 ;@Ahk2Exe-SetOrigFilename Wideside.exe
@@ -24,7 +24,7 @@ DllCall("SetThreadDpiAwarenessContext", "ptr", -4, "ptr")
 CoordMode "Mouse", "Screen"
 
 global AppName := "Wideside"
-global AppVersion := "1.5.0"
+global AppVersion := "1.6.1"
 global AppUrl := "https://crxigzah.github.io/wideside/"
 
 ; Settings live in %AppData% so it works when installed to Program Files.
@@ -806,6 +806,13 @@ InstallUpdate(*) {
     }
 }
 
+; The guide ships next to the exe (installer and portable zip); fall back to
+; the website copy when running from source
+OpenGuide(*) {
+    guideFile := A_ScriptDir "\Wideside Guide.html"
+    Run FileExist(guideFile) ? '"' guideFile '"' : AppUrl "guide.html"
+}
+
 StartupLink() => A_Startup "\" AppName ".lnk"
 
 SetStartup(on) {
@@ -903,8 +910,10 @@ ShowAbout(welcome := false, *) {
 
     y += 14
     g.SetFont("s9 c" C_Muted)
-    link := g.AddText("x24 y" (y + 8) " w200", "Website")
+    link := g.AddText("x24 y" (y + 8) " w60", "Website")
     link.OnEvent("Click", (*) => Run(AppUrl))
+    guide := g.AddText("x+16 yp w60", "Guide")
+    guide.OnEvent("Click", OpenGuide)
     AddButton(g, "x" (W - 236) " y" y " w120", "Settings", (*) => (CloseAbout(), ShowSettings()), false)
     AddButton(g, "x" (W - 104) " y" y " w120", welcome ? "Got it" : "Close", CloseAbout)
 
@@ -1046,6 +1055,7 @@ BuildTrayMenu() {
         tray.Add("Update to version " LatestVersion, InstallUpdate)
     else
         tray.Add("Check for updates", CheckForUpdates.Bind(true))
+    tray.Add("User guide", OpenGuide)
     tray.Add("About and hotkeys", ShowAbout.Bind(false))
     tray.Add("Reload", (*) => Reload())
     tray.Add("Exit", (*) => ExitApp())

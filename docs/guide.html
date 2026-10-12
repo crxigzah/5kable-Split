@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wideside Guide</title>
+<meta name="description" content="How to use Wideside: snapping windows into zones, hotkeys, layouts, custom layouts, settings and troubleshooting.">
+<meta name="theme-color" content="#101114">
+<!-- This page is also shipped next to Wideside.exe, so it's self-contained:
+     inline styles and logo, absolute links back to the website. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 256 256'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23FFA24A'/%3E%3Cstop offset='1' stop-color='%23FF5A36'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect x='8' y='8' width='240' height='240' rx='58' fill='url(%23g)'/%3E%3Crect x='28' y='88' width='96' height='76' rx='11' fill='%23fff'/%3E%3Crect x='132' y='88' width='96' height='76' rx='11' fill='%23fff' fill-opacity='0.42'/%3E%3Crect x='104' y='178' width='48' height='12' rx='6' fill='%23fff' fill-opacity='0.9'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #101114; --bg2: #15161a; --card: #1a1c21; --border: #2a2d35;
+  --text: #f4f4f5; --muted: #9a9da8; --accent: #ff7a3d; --accent-hi: #ffa24a; --accent-lo: #ff5a36;
+}
+@media (prefers-color-scheme: light) {
+  :root { --bg: #fbfaf8; --bg2: #f3f1ed; --card: #ffffff; --border: #e6e2db; --text: #18181b; --muted: #5d5d68; --accent: #e5571a; }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; scroll-padding-top: 80px; }
+body { background: var(--bg); color: var(--text); font-family: Inter, 'Segoe UI', system-ui, sans-serif; line-height: 1.65; -webkit-font-smoothing: antialiased; }
+a { color: var(--accent); }
+h1, h2, h3, .brand { font-family: 'Space Grotesk', Inter, 'Segoe UI', sans-serif; letter-spacing: -0.02em; }
+
+header.top { position: sticky; top: 0; z-index: 5; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
+header.top .bar { max-width: 1120px; margin: 0 auto; padding: 0 24px; height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 19px; color: inherit; text-decoration: none; }
+.brand svg { width: 30px; height: 30px; }
+.brand span { color: var(--muted); font-weight: 600; }
+header.top nav { display: flex; gap: 22px; font-size: 14px; }
+header.top nav a { color: var(--muted); text-decoration: none; }
+header.top nav a:hover { color: var(--text); }
+
+.layout { max-width: 1120px; margin: 0 auto; padding: 0 24px; display: grid; grid-template-columns: 220px 1fr; gap: 56px; }
+aside { position: sticky; top: 64px; align-self: start; max-height: calc(100vh - 64px); overflow-y: auto; padding: 40px 0; }
+aside p { font-size: 11.5px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
+aside ol { list-style: none; display: grid; gap: 2px; }
+aside a { display: block; padding: 5px 10px; border-radius: 7px; font-size: 14px; color: var(--muted); text-decoration: none; }
+aside a:hover { color: var(--text); background: var(--card); }
+
+main { padding: 48px 0 96px; min-width: 0; }
+.intro h1 { font-size: clamp(32px, 5vw, 44px); line-height: 1.08; margin-bottom: 12px; }
+.intro p { font-size: 17px; color: var(--muted); max-width: 620px; }
+section { padding-top: 48px; }
+section + section { border-top: 1px solid var(--border); margin-top: 48px; }
+h2 { font-size: 26px; margin-bottom: 14px; }
+h3 { font-size: 17px; margin: 26px 0 8px; }
+p { color: var(--muted); font-size: 15px; max-width: 720px; }
+p + p { margin-top: 12px; }
+strong { color: var(--text); font-weight: 600; }
+ul.list, ol.steps { color: var(--muted); font-size: 15px; padding-left: 22px; display: grid; gap: 8px; margin-top: 12px; max-width: 720px; }
+ol.steps li::marker { color: var(--accent); font-weight: 700; }
+kbd { font: 600 12px Inter, 'Segoe UI', sans-serif; color: var(--text); background: var(--card); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 6px; padding: 1px 7px; white-space: nowrap; }
+code { font: 13px Consolas, 'Cascadia Mono', ui-monospace, monospace; background: var(--card); border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; color: var(--text); }
+pre { font: 13px/1.6 Consolas, 'Cascadia Mono', ui-monospace, monospace; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; overflow-x: auto; margin-top: 12px; max-width: 720px; color: var(--text); }
+pre .c { color: var(--muted); }
+
+.tip { background: var(--card); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 12px; padding: 14px 18px; margin-top: 16px; max-width: 720px; }
+.tip p { color: var(--text); font-size: 14.5px; }
+
+table { width: 100%; max-width: 720px; border-collapse: collapse; margin-top: 14px; font-size: 14.5px; }
+th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 700; }
+td { color: var(--muted); }
+td:first-child { color: var(--text); white-space: nowrap; }
+
+.figure { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 16px; }
+.mini { width: 220px; }
+.mini .scr { position: relative; aspect-ratio: 21 / 9; background: var(--bg2); border: 2px solid var(--border); border-radius: 9px; }
+.mini .z { position: absolute; border: 1.5px solid var(--accent); border-radius: 3px; }
+.mini .z.hot { border-width: 3px; background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.mini small { display: block; text-align: center; font-size: 12.5px; color: var(--muted); margin-top: 8px; }
+
+footer { border-top: 1px solid var(--border); padding: 28px 24px; text-align: center; font-size: 13px; color: var(--muted); }
+
+@media (max-width: 860px) {
+  .layout { grid-template-columns: 1fr; gap: 0; }
+  aside { position: static; max-height: none; padding: 24px 0 0; }
+  aside ol { grid-template-columns: 1fr 1fr; }
+  header.top nav a:not(:last-child) { display: none; }
+}
+@media (max-width: 560px) {
+  header.top .bar, .layout { padding: 0 16px; }
+  td:first-child { white-space: normal; }
+  .mini { width: 100%; }
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="bar">
+    <a class="brand" href="https://crxigzah.github.io/wideside/">
+      <svg viewBox="0 0 256 256" aria-hidden="true"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFA24A"/><stop offset="1" stop-color="#FF5A36"/></linearGradient></defs><rect x="8" y="8" width="240" height="240" rx="58" fill="url(#lg)"/><rect x="28" y="88" width="96" height="76" rx="11" fill="#fff"/><rect x="132" y="88" width="96" height="76" rx="11" fill="#fff" fill-opacity="0.42"/><rect x="104" y="178" width="48" height="12" rx="6" fill="#fff" fill-opacity="0.9"/></svg>
+      Wideside <span>Guide</span>
+    </a>
+    <nav>
+      <a href="https://crxigzah.github.io/wideside/">Home</a>
+      <a href="https://github.com/crxigzah/wideside/releases/latest">Releases</a>
+      <a href="https://github.com/crxigzah/wideside/releases/latest/download/Wideside-Setup.exe">Download</a>
+    </nav>
+  </div>
+</header>
+
+<div class="layout">
+  <aside>
+    <p>On this page</p>
+    <ol>
+      <li><a href="#install">Install</a></li>
+      <li><a href="#snapping">Snapping windows</a></li>
+      <li><a href="#free">Moving freely</a></li>
+      <li><a href="#span">Spanning zones</a></li>
+      <li><a href="#tabs">Browser tabs</a></li>
+      <li><a href="#hotkeys">Hotkeys</a></li>
+      <li><a href="#layouts">Layouts</a></li>
+      <li><a href="#custom">Custom layouts</a></li>
+      <li><a href="#settings">Settings</a></li>
+      <li><a href="#apps">Remembered apps</a></li>
+      <li><a href="#updates">Updates</a></li>
+      <li><a href="#troubleshooting">Troubleshooting</a></li>
+      <li><a href="#uninstall">Uninstall</a></li>
+    </ol>
+  </aside>
+
+  <main>
+    <div class="intro">
+      <h1>Using Wideside</h1>
+      <p>Wideside splits a big monitor into zones. Drag a window and drop it on a zone, and it fills that zone exactly, like Dell Easy Arrange. This guide covers everything it can do.</p>
+    </div>
+
+    <section id="install">
+      <h2>Install</h2>
+      <ol class="steps">
+        <li>Download <strong>Wideside-Setup.exe</strong> and run it. It installs just for you, so it doesn't need admin rights.</li>
+        <li>If Windows shows <strong>"Windows protected your PC"</strong>, click <strong>More info</strong>, then <strong>Run anyway</strong>. Windows shows this for new apps that aren't code-signed.</li>
+        <li>Leave <strong>Start Wideside when Windows starts</strong> ticked if you want it running all the time.</li>
+        <li>Wideside runs in the system tray, next to the clock. Click the orange icon for Settings, or right-click it for the menu. If you can't see it, click the <kbd>^</kbd> arrow to show hidden icons and drag it onto the taskbar.</li>
+      </ol>
+      <div class="tip"><p><strong>Portable version:</strong> the portable .zip contains <code>Wideside.exe</code> and this guide. Unzip it anywhere and run the exe. Nothing gets installed.</p></div>
+    </section>
+
+    <section id="snapping">
+      <h2>Snapping windows</h2>
+      <p>Drag any window by its title bar. Once it starts moving, every zone appears as an orange outline with its number in the corner. The zone under your mouse gets a thick outline and a light orange tint. Let go, and the window fills that zone exactly.</p>
+      <div class="figure">
+        <div class="mini"><div class="scr"><div class="z" style="left:4px;top:4px;width:calc(50% - 6px);bottom:4px"></div><div class="z hot" style="right:4px;top:4px;width:calc(50% - 6px);bottom:4px"></div></div><small>Mouse over zone 2: drop to fill it</small></div>
+        <div class="mini"><div class="scr"><div class="z" style="left:4px;top:4px;width:calc(33.3% - 5px);bottom:4px"></div><div class="z hot" style="left:calc(33.3% + 2px);top:4px;width:calc(33.3% - 4px);bottom:4px"></div><div class="z" style="right:4px;top:4px;width:calc(33.3% - 5px);bottom:4px"></div></div><small>Three columns: drop in the middle</small></div>
+      </div>
+      <ul class="list">
+        <li>Maximised windows work too. Drag them off the top and drop them on a zone.</li>
+        <li>Just clicking a title bar doesn't show the zones. They only appear once the window has actually moved.</li>
+        <li>Windows' own Snap (edge snapping and the layout bar at the top of the screen) is paused while Wideside runs, so the two don't fight. It comes back when you close or pause Wideside.</li>
+      </ul>
+    </section>
+
+    <section id="free">
+      <h2>Moving windows freely</h2>
+      <p>Hold <kbd>Ctrl</kbd> while dragging to move a window anywhere without snapping. The zones disappear while Ctrl is held and the window stays exactly where you drop it. You can press Ctrl partway through a drag.</p>
+      <p>To turn snapping off for a while, press <kbd>Win</kbd> <kbd>Alt</kbd> <kbd>P</kbd> or choose <strong>Pause snapping</strong> in the tray menu. Do the same again to turn it back on.</p>
+    </section>
+
+    <section id="span">
+      <h2>Spanning zones</h2>
+      <p>Drop a window <strong>on the line between two zones</strong> and it fills both. The highlight shows the combined area before you let go. Near a corner where four zones meet, it takes all four.</p>
+      <div class="figure">
+        <div class="mini"><div class="scr"><div class="z" style="left:4px;top:4px;width:calc(33.3% - 5px);bottom:4px"></div><div class="z hot" style="left:calc(33.3% + 2px);top:4px;right:4px;bottom:4px"></div></div><small>Three columns: drop on the line between 2 and 3</small></div>
+      </div>
+    </section>
+
+    <section id="tabs">
+      <h2>Browser tabs on each side</h2>
+      <p>To have a browser on each side with its own tab bar, use separate browser windows. Drag a tab down off the tab bar, keep dragging, and drop it on a zone. It becomes its own window filling that zone. This works in Chrome, Edge, Opera, Brave and other Chromium browsers.</p>
+      <div class="tip"><p><strong>Opera users:</strong> Opera's own split screen catches tab drags with its "Drop tab here to split screen" cards. Press <kbd>Alt</kbd> <kbd>P</kbd> in Opera, search <strong>split screen</strong>, and turn off <strong>Enable a split screen by drag and drop</strong>.</p></div>
+    </section>
+
+    <section id="hotkeys">
+      <h2>Hotkeys</h2>
+      <table>
+        <tr><th>Keys</th><th>What it does</th></tr>
+        <tr><td>Drag a window</td><td>Show zones, drop to snap</td></tr>
+        <tr><td>Drop on a line</td><td>Span both zones</td></tr>
+        <tr><td><kbd>Ctrl</kbd> + drag</td><td>Move freely, no snapping</td></tr>
+        <tr><td><kbd>Win</kbd> <kbd>Alt</kbd> <kbd>←</kbd> / <kbd>→</kbd></td><td>Move the active window to the previous / next zone</td></tr>
+        <tr><td><kbd>Win</kbd> <kbd>Alt</kbd> <kbd>1</kbd>–<kbd>9</kbd></td><td>Snap the active window to that zone number</td></tr>
+        <tr><td><kbd>Win</kbd> <kbd>Alt</kbd> <kbd>↑</kbd></td><td>Maximise across the whole screen</td></tr>
+        <tr><td><kbd>Win</kbd> <kbd>Alt</kbd> <kbd>A</kbd></td><td>Arrange all open windows into the zones, most recently used first</td></tr>
+        <tr><td><kbd>Win</kbd> <kbd>Alt</kbd> <kbd>L</kbd></td><td>Switch to the next layout</td></tr>
+        <tr><td><kbd>Win</kbd> <kbd>Alt</kbd> <kbd>Z</kbd></td><td>Flash the zones and their numbers on screen</td></tr>
+        <tr><td><kbd>Win</kbd> <kbd>Alt</kbd> <kbd>P</kbd></td><td>Pause / resume snapping</td></tr>
+      </table>
+      <p style="margin-top:14px">The zone hotkeys and Arrange all work on the monitor the active window is on.</p>
+    </section>
+
+    <section id="layouts">
+      <h2>Layouts</h2>
+      <p>Pick a layout in <strong>Settings</strong>, from <strong>Layout</strong> in the tray menu, or cycle through them with <kbd>Win</kbd> <kbd>Alt</kbd> <kbd>L</kbd>. Zones are numbered left to right, then top to bottom.</p>
+      <table>
+        <tr><th>Layout</th><th>Zones</th></tr>
+        <tr><td>Two halves (50/50)</td><td>Left half, right half</td></tr>
+        <tr><td>Wide left (60/40)</td><td>A wider left zone and a narrower right one</td></tr>
+        <tr><td>Wide right (40/60)</td><td>The same, mirrored</td></tr>
+        <tr><td>Three columns</td><td>Three equal columns</td></tr>
+        <tr><td>Focus centre (25/50/25)</td><td>A big middle column with narrow sides</td></tr>
+        <tr><td>Left half + right stacked</td><td>Left half, with the right half split top and bottom</td></tr>
+        <tr><td>Four quarters</td><td>A 2 × 2 grid</td></tr>
+      </table>
+      <p style="margin-top:14px"><strong>Gap between windows</strong> in Settings adds an even gap around and between windows (0 to 24 px). At 0 they fill the screen edge to edge.</p>
+    </section>
+
+    <section id="custom">
+      <h2>Custom layouts</h2>
+      <p>In Settings, click <strong>Edit custom layouts…</strong>. That opens the settings file in Notepad. Add lines under <code>[CustomLayouts]</code>, save, then choose <strong>Reload</strong> from the tray menu. Your layouts appear after the built-in ones.</p>
+      <p>Each line is a name, then the zones separated by <code>|</code>. Each zone is four numbers from 0 to 1, as fractions of the screen: <strong>left, top, width, height</strong>.</p>
+<pre><span class="c">[CustomLayouts]
+; Big window on the left, two stacked on the right</span>
+Coding=0,0,0.65,1 | 0.65,0,0.35,0.5 | 0.65,0.5,0.35,0.5
+
+<span class="c">; Two halves with a narrow strip on the far right for chat</span>
+Halves + chat=0,0,0.4,1 | 0.4,0,0.4,1 | 0.8,0,0.2,1
+
+<span class="c">; Top two-thirds across the screen, two zones underneath</span>
+Wide top=0,0,1,0.66 | 0,0.66,0.5,0.34 | 0.5,0.66,0.5,0.34</pre>
+      <div class="tip"><p>Check your numbers if a layout doesn't show up. Each zone needs exactly four values between 0 and 1, and any mistake on a line makes Wideside skip that line.</p></div>
+    </section>
+
+    <section id="settings">
+      <h2>Settings</h2>
+      <p>Click the tray icon to open Settings. Changes apply straight away.</p>
+      <table>
+        <tr><th>Setting</th><th>What it does</th></tr>
+        <tr><td>Layout</td><td>Which set of zones to use, with a live preview shaped like your monitor.</td></tr>
+        <tr><td>Gap between windows</td><td>Space around and between snapped windows. 0 px fills the screen edge to edge.</td></tr>
+        <tr><td>Only show zones while holding Shift</td><td>Off by default. When on, zones only appear if you hold <kbd>Shift</kbd> while dragging, and normal drags never snap.</td></tr>
+        <tr><td>Turn off Windows Snap while Wideside runs</td><td>On by default. Pauses Windows' built-in snapping so it doesn't compete with the zones. It's restored when Wideside closes or is paused.</td></tr>
+        <tr><td>Reopen apps in the zone they were last snapped to</td><td>On by default. See <a href="#apps">Remembered apps</a>.</td></tr>
+        <tr><td>Check for updates automatically</td><td>On by default. See <a href="#updates">Updates</a>.</td></tr>
+        <tr><td>Start Wideside with Windows</td><td>Runs Wideside when you sign in.</td></tr>
+      </table>
+      <p style="margin-top:14px">Settings are saved in <code>%AppData%\Wideside\settings.ini</code>, so they're kept when you update.</p>
+    </section>
+
+    <section id="apps">
+      <h2>Remembered apps</h2>
+      <p>Whenever you snap a window, Wideside remembers which zone that app was in. The next time you open the app, its window goes straight back there. Snap Opera to the right once, and it opens on the right from then on.</p>
+      <p>To avoid surprises, this only happens when it's the app's <strong>only</strong> window and you're using the <strong>same layout</strong> as when it was saved. Extra windows, dialogs and tabs you pull off aren't moved. Snap the app somewhere else to change its remembered zone.</p>
+    </section>
+
+    <section id="updates">
+      <h2>Updates</h2>
+      <p>Wideside checks GitHub for a new version a few seconds after it starts, then every 6 hours. When one is out, you get a notification and the tray menu shows <strong>Update to version X</strong>. Click it to download and run the new installer. It upgrades in place and keeps your settings.</p>
+      <p>To check yourself, choose <strong>Check for updates</strong> in the tray menu. The update check is the only time Wideside goes online, and you can turn it off in Settings.</p>
+    </section>
+
+    <section id="troubleshooting">
+      <h2>Troubleshooting</h2>
+      <h3>Some windows won't move or snap</h3>
+      <p>Apps running as administrator, such as Task Manager, can't be moved by a normal app. Right-click Wideside in the Start menu and choose <strong>Run as administrator</strong> if you need those too.</p>
+      <h3>A window doesn't fill its zone</h3>
+      <p>Some apps have a minimum width and won't shrink below it. Use a wider zone, or a layout like Wide left (60/40).</p>
+      <h3>There's a thin line between windows at 0 px gap</h3>
+      <p>That's the 1px border Windows 11 draws around every window, not a gap.</p>
+      <h3>Windows Snap stays off after Wideside closes</h3>
+      <p>Wideside turns Windows Snap back on when it exits normally. If it was force-closed, signing out and back in restores it. You can also check <strong>Settings → System → Multitasking → Snap windows</strong>.</p>
+      <h3>I changed monitors or resolution</h3>
+      <p>Zones are worked out again automatically. If anything looks off, choose <strong>Reload</strong> from the tray menu.</p>
+      <h3>Something else</h3>
+      <p><a href="https://github.com/crxigzah/wideside/issues">Report a problem on GitHub</a> and say what you were doing and what happened.</p>
+    </section>
+
+    <section id="uninstall">
+      <h2>Uninstall</h2>
+      <p>Go to <strong>Settings → Apps → Installed apps → Wideside → Uninstall</strong>. Your settings stay in <code>%AppData%\Wideside</code> in case you reinstall. Delete that folder to remove them too. For the portable version, delete the folder you unzipped.</p>
+    </section>
+  </main>
+</div>
+
+<footer>© 2026 Wideside · <a href="https://crxigzah.github.io/wideside/">crxigzah.github.io/wideside</a></footer>
+</body>
+</html>

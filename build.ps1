@@ -81,7 +81,13 @@ if ($p.ExitCode -ne 0 -or -not (Test-Path $Exe)) { throw "Ahk2Exe failed (exit c
 # 5. Portable zip
 $Portable = Join-Path $Dist "Wideside-$Version-portable.zip"
 Remove-Item $Portable -ErrorAction SilentlyContinue
-Compress-Archive -Path $Exe -DestinationPath $Portable
+# The portable zip carries the user guide next to the exe
+$Stage = Join-Path $Tools 'portable'
+Remove-Item $Stage -Recurse -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force -Path $Stage | Out-Null
+Copy-Item $Exe $Stage
+Copy-Item (Join-Path $Root 'docs\guide.html') (Join-Path $Stage 'Wideside Guide.html')
+Compress-Archive -Path (Join-Path $Stage '*') -DestinationPath $Portable
 
 # 6. Installer
 function Find-Iscc {
