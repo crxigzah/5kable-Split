@@ -8,7 +8,7 @@
 ;@Ahk2Exe-SetName Wideside
 ;@Ahk2Exe-SetProductName Wideside
 ;@Ahk2Exe-SetDescription Wideside
-;@Ahk2Exe-SetVersion 1.6.1
+;@Ahk2Exe-SetVersion 1.7.0
 ;@Ahk2Exe-SetCompanyName Wideside
 ;@Ahk2Exe-SetCopyright Copyright 2026 Wideside
 ;@Ahk2Exe-SetOrigFilename Wideside.exe
@@ -24,7 +24,7 @@ DllCall("SetThreadDpiAwarenessContext", "ptr", -4, "ptr")
 CoordMode "Mouse", "Screen"
 
 global AppName := "Wideside"
-global AppVersion := "1.6.1"
+global AppVersion := "1.7.0"
 global AppUrl := "https://crxigzah.github.io/wideside/"
 
 ; Settings live in %AppData% so it works when installed to Program Files.
@@ -35,16 +35,17 @@ global LogoFile := DataDir "\logo.png"
 ; Wideside palette
 global C_Bg := "101114", C_Card := "1C1E25", C_Accent := "FF7A3D"
 global C_Text := "F4F4F5", C_Muted := "9A9DA8"
+global C_Border := "2A2D35", C_Zone := "3A3D48"
 
 ; Zones are [x, y, width, height] as fractions of the screen's work area.
 global BuiltInLayouts := [
-    {name: "Two halves (50/50)",          zones: [[0, 0, 1/2, 1], [1/2, 0, 1/2, 1]]},
-    {name: "Wide left (60/40)",           zones: [[0, 0, 0.6, 1], [0.6, 0, 0.4, 1]]},
-    {name: "Wide right (40/60)",          zones: [[0, 0, 0.4, 1], [0.4, 0, 0.6, 1]]},
-    {name: "Three columns",               zones: [[0, 0, 1/3, 1], [1/3, 0, 1/3, 1], [2/3, 0, 1/3, 1]]},
-    {name: "Focus centre (25/50/25)",     zones: [[0, 0, 0.25, 1], [0.25, 0, 0.5, 1], [0.75, 0, 0.25, 1]]},
-    {name: "Left half + right stacked",   zones: [[0, 0, 1/2, 1], [1/2, 0, 1/2, 1/2], [1/2, 1/2, 1/2, 1/2]]},
-    {name: "Four quarters",               zones: [[0, 0, 1/2, 1/2], [1/2, 0, 1/2, 1/2], [0, 1/2, 1/2, 1/2], [1/2, 1/2, 1/2, 1/2]]}
+    {name: "Two halves (50/50)", short: "50 / 50", zones: [[0, 0, 1/2, 1], [1/2, 0, 1/2, 1]]},
+    {name: "Wide left (60/40)", short: "60 / 40", zones: [[0, 0, 0.6, 1], [0.6, 0, 0.4, 1]]},
+    {name: "Wide right (40/60)", short: "40 / 60", zones: [[0, 0, 0.4, 1], [0.4, 0, 0.6, 1]]},
+    {name: "Three columns", short: "Thirds", zones: [[0, 0, 1/3, 1], [1/3, 0, 1/3, 1], [2/3, 0, 1/3, 1]]},
+    {name: "Focus centre (25/50/25)", short: "Focus", zones: [[0, 0, 0.25, 1], [0.25, 0, 0.5, 1], [0.75, 0, 0.25, 1]]},
+    {name: "Left half + right stacked", short: "Left + stack", zones: [[0, 0, 1/2, 1], [1/2, 0, 1/2, 1/2], [1/2, 1/2, 1/2, 1/2]]},
+    {name: "Four quarters", short: "Quarters", zones: [[0, 0, 1/2, 1/2], [1/2, 0, 1/2, 1/2], [0, 1/2, 1/2, 1/2], [1/2, 1/2, 1/2, 1/2]]}
 ]
 global GapOptions := [0, 4, 8, 12, 16, 24]
 
@@ -930,97 +931,173 @@ CloseAbout(*) {
     AboutGui := 0
 }
 
-; Settings window with a live mini-preview of the layout
-global PreviewBox := 0, PreviewZonesCtl := [], LayoutDDL := 0, PrevW := 360, PrevH := 150
+; Settings window: layouts as clickable diagrams, gap as pills, and the
+; options as switches. Native controls are square and flat, so these are
+; drawn from plain text controls clipped to rounded shapes.
+global SetTiles := [], SetGapPills := []
+
+; Round a control's corners (radius in DIPs)
+RoundCtrl(ctrl, radius) {
+    rc := Buffer(16)
+    DllCall("GetWindowRect", "ptr", ctrl.Hwnd, "ptr", rc)
+    w := NumGet(rc, 8, "int") - NumGet(rc, 0, "int"), h := NumGet(rc, 12, "int") - NumGet(rc, 4, "int")
+    r := Round(radius * A_ScreenDPI / 96) * 2
+    rgn := DllCall("CreateRoundRectRgn", "int", 0, "int", 0, "int", w + 1, "int", h + 1, "int", r, "int", r, "ptr")
+    DllCall("SetWindowRgn", "ptr", ctrl.Hwnd, "ptr", rgn, "int", true)
+}
+
+; Controls that sit underneath others are created last with WS_CLIPSIBLINGS
+; (+0x4000000): the first-created control is on top, and clipping stops a
+; background repainting over what sits on it.
+SectionLabel(g, y, text) {
+    g.SetFont("s8 bold c" C_Muted)
+    g.AddText("x28 y" y " BackgroundTrans", text)
+}
+
+AddLayoutTile(g, x, y, w, h, layout, idx) {
+    click := (*) => SetLayout(idx)
+    dx := x + 12, dy := y + 12, dw := w - 24, dh := Round(dw * 9 / 21)
+    zones := []
+    for z in layout.zones {
+        zx := dx + Round(z[1] * dw) + 1, zy := dy + Round(z[2] * dh) + 1
+        zw := Round(z[3] * dw) - 2, zh := Round(z[4] * dh) - 2
+        zc := g.AddText("x" zx " y" zy " w" zw " h" zh " Background" C_Zone)
+        RoundCtrl(zc, 3)
+        zones.Push(zc)
+    }
+    g.SetFont("s9 norm c" C_Muted)
+    name := g.AddText("x" (x + 10) " y" (dy + dh + 9) " w" (w - 20) " h18 Center Background" C_Card
+        , layout.HasOwnProp("short") ? layout.short : layout.name)
+    card := g.AddText("x" (x + 2) " y" (y + 2) " w" (w - 4) " h" (h - 4) " +0x4000000 Background" C_Card)
+    edge := g.AddText("x" x " y" y " w" w " h" h " +0x4000000 Background" C_Border)
+    RoundCtrl(card, 9), RoundCtrl(edge, 11)
+    for c in [edge, card, name]
+        c.OnEvent("Click", click)
+    for c in zones
+        c.OnEvent("Click", click)
+    return {edge: edge, card: card, zones: zones, name: name}
+}
+
+StyleTile(t, on) {
+    t.edge.Opt("+Background" (on ? C_Accent : C_Border))
+    for z in t.zones
+        z.Opt("+Background" (on ? C_Accent : C_Zone))
+    t.name.SetFont((on ? "bold c" C_Text : "norm c" C_Muted))
+    t.edge.Redraw(), t.card.Redraw()
+    for z in t.zones
+        z.Redraw()
+    t.name.Redraw()
+}
+
+AddSwitch(g, x, y, on, callback) {
+    knob := g.AddText("x" (x + (on ? 21 : 3)) " y" (y + 3) " w16 h16 Background" C_Text)
+    track := g.AddText("x" x " y" y " w40 h22 +0x4000000 Background" (on ? C_Accent : C_Zone))
+    RoundCtrl(knob, 8), RoundCtrl(track, 11)
+    sw := {knob: knob, track: track, on: on, x: x, y: y, cb: callback}
+    track.OnEvent("Click", (*) => ToggleSwitch(sw))
+    knob.OnEvent("Click", (*) => ToggleSwitch(sw))
+    return sw
+}
+
+ToggleSwitch(sw) {
+    sw.on := !sw.on
+    sw.track.Opt("+Background" (sw.on ? C_Accent : C_Zone))
+    sw.knob.Move(sw.x + (sw.on ? 21 : 3), sw.y + 3)
+    sw.track.Redraw(), sw.knob.Redraw()
+    sw.cb.Call(sw.on)
+}
 
 ShowSettings(*) {
-    global SettingsGui, PreviewBox, PreviewZonesCtl, LayoutDDL, PrevH
+    global SettingsGui, SetTiles, SetGapPills
     if SettingsGui {
         SettingsGui.Show()
         return
     }
-    W := 440
+    W := 520                    ; content width
     g := NewBrandedGui(AppName " Settings")
-    AddHeader(g, "Version " AppVersion, W)
 
-    y := 110
-    g.SetFont("s9 bold c" C_Muted)
-    g.AddText("x24 y" y, "LAYOUT")
-    g.SetFont("s10 norm c" C_Text)
-    names := []
-    for l in Layouts
-        names.Push(l.name)
-    LayoutDDL := g.AddDropDownList("x24 y" (y + 22) " w" (W - 24) " Choose" LayoutIndex " Background" C_Card, names)
-    DarkControl(LayoutDDL)
-    LayoutDDL.OnEvent("Change", (c, *) => SetLayout(c.Value))
+    if FileExist(LogoFile)
+        g.AddPicture("x28 y24 w40 h40", LogoFile)
+    g.SetFont("s15 bold c" C_Text)
+    g.AddText("x80 y21 BackgroundTrans", "Settings")
+    g.SetFont("s9 norm c" C_Muted)
+    g.AddText("x80 y48 BackgroundTrans", "Wideside " AppVersion)
 
-    ; Preview matches the shape of the main monitor (ultrawide, 16:9, etc.)
-    MonitorGet MonitorGetPrimary(), &L, &T, &R, &B
-    PrevH := Max(80, Min(200, Round(PrevW * (B - T) / (R - L))))
-    py := y + 64
-    px := 24 + ((W - 24) - PrevW) // 2
-    PreviewBox := {x: px, y: py}
-    g.AddText("x" px " y" py " w" PrevW " h" PrevH " Background" C_Card)
-    PreviewZonesCtl := []
-    g.SetFont("s14 bold c" C_Bg)
-    Loop 12
-        PreviewZonesCtl.Push(g.AddText("x" px " y" py " w10 h10 Hidden Center +0x200 Background" C_Accent, A_Index))
-    g.SetFont("s10 norm c" C_Text)
+    ; Layouts: a grid of diagram cards
+    y := 92
+    SectionLabel(g, y, "LAYOUT")
+    y += 24
+    cols := 4, tw := 118, th := 92
+    SetTiles := []
+    for i, l in Layouts
+        SetTiles.Push(AddLayoutTile(g, 28 + Mod(i - 1, cols) * (tw + 16), y + (i - 1) // cols * (th + 14), tw, th, l, i))
+    y += Ceil(Layouts.Length / cols) * (th + 14) + 12
 
-    y := py + PrevH + 22
-    g.SetFont("s9 bold c" C_Muted)
-    g.AddText("x24 y" y, "GAP BETWEEN WINDOWS")
-    g.SetFont("s10 norm c" C_Text)
-    gaps := [], gapIdx := 1
+    ; Gap: a row of pills
+    SectionLabel(g, y, "GAP BETWEEN WINDOWS")
+    y += 24
+    SetGapPills := []
     for i, v in GapOptions {
-        gaps.Push(v " px")
-        if v = Gap
-            gapIdx := i
+        g.SetFont("s9 norm c" C_Text)
+        pill := g.AddText("x" (28 + (i - 1) * 62) " y" y " w54 h30 Center +0x200 Background" C_Card, v " px")
+        RoundCtrl(pill, 8)
+        pill.OnEvent("Click", ((v, *) => (SetGap(v), RefreshSettings())).Bind(v))
+        SetGapPills.Push({ctl: pill, v: v})
     }
-    gapDDL := g.AddDropDownList("x24 y" (y + 22) " w120 Choose" gapIdx " Background" C_Card, gaps)
-    DarkControl(gapDDL)
-    gapDDL.OnEvent("Change", (c, *) => (SetGap(GapOptions[c.Value]), RefreshSettings()))
+    y += 52
 
-    y += 68
-    AddToggle(g, y, "Only show zones while holding Shift", RequireShift, SetRequireShift)
-    AddToggle(g, y + 28, "Turn off Windows Snap while Wideside runs", PauseWinSnap, SetPauseWinSnap)
-    AddToggle(g, y + 56, "Reopen apps in the zone they were last snapped to", RememberApps, SetRememberApps)
-    AddToggle(g, y + 84, "Check for updates automatically", CheckUpdates, SetCheckUpdates)
-    AddToggle(g, y + 112, "Start Wideside with Windows", FileExist(StartupLink()) != "", SetStartup)
+    ; Options: switches in one card
+    SectionLabel(g, y, "OPTIONS")
+    y += 24
+    rows := [
+        ["Only show zones while holding Shift", "Off: every drag shows zones. Ctrl + drag always moves freely.", RequireShift, SetRequireShift],
+        ["Pause Windows Snap", "Stops Windows' own snapping competing with the zones", PauseWinSnap, SetPauseWinSnap],
+        ["Remember app zones", "Apps reopen in the zone they were last snapped to", RememberApps, SetRememberApps],
+        ["Check for updates", "Looks for new versions on GitHub every few hours", CheckUpdates, SetCheckUpdates],
+        ["Start with Windows", "Run Wideside when you sign in", FileExist(StartupLink()) != "", SetStartup]
+    ]
+    rh := 60
+    for i, r in rows {
+        ry := y + (i - 1) * rh
+        sw := AddSwitch(g, 28 + W - 58, ry + 19, r[3], r[4])
+        g.SetFont("s10 norm c" C_Text)
+        t := g.AddText("x46 y" (ry + 11) " w" (W - 100) " Background" C_Card, r[1])
+        g.SetFont("s9 norm c" C_Muted)
+        d := g.AddText("x46 y" (ry + 32) " w" (W - 100) " Background" C_Card, r[2])
+        for c in [t, d]
+            c.OnEvent("Click", ((sw, *) => ToggleSwitch(sw)).Bind(sw))
+        if i > 1
+            g.AddText("x46 y" ry " w" (W - 36) " h1 Background" C_Border)
+    }
+    box := g.AddText("x28 y" y " w" W " h" (rows.Length * rh) " +0x4000000 Background" C_Card)
+    RoundCtrl(box, 12)
+    y += rows.Length * rh + 22
 
-    y += 156
-    g.SetFont("s9 c" C_Accent)
-    custom := g.AddText("x24 y" (y + 8) " w220", "Edit custom layouts...")
+    g.SetFont("s9 norm c" C_Accent)
+    custom := g.AddText("x28 y" (y + 9) " BackgroundTrans", "Edit custom layouts")
     custom.OnEvent("Click", EditCustomLayouts)
-    AddButton(g, "x" (W - 104) " y" y " w120", "Done", CloseSettings)
+    guide := g.AddText("x+20 yp BackgroundTrans", "User guide")
+    guide.OnEvent("Click", OpenGuide)
+    done := AddButton(g, "x" (28 + W - 110) " y" y " w110", "Done", CloseSettings)
+    RoundCtrl(done, 9)
 
     g.OnEvent("Close", CloseSettings)
     g.OnEvent("Escape", CloseSettings)
     SettingsGui := g
     RefreshSettings()
-    g.Show("w" (W + 24))
+    g.Show("w" (W + 56) " h" (y + 36 + 26))
 }
 
 RefreshSettings() {
     if !SettingsGui
         return
-    LayoutDDL.Value := LayoutIndex
-    zones := CurrentZones()
-    pg := Max(2, Round(Gap / 3))
-    aw := PrevW - pg, ah := PrevH - pg
-    for i, ctl in PreviewZonesCtl {
-        if i > zones.Length {
-            ctl.Visible := false
-            continue
-        }
-        z := zones[i]
-        x1 := Round(PreviewBox.x + pg / 2 + z[1] * aw + pg / 2)
-        y1 := Round(PreviewBox.y + pg / 2 + z[2] * ah + pg / 2)
-        x2 := Round(PreviewBox.x + pg / 2 + (z[1] + z[3]) * aw - pg / 2)
-        y2 := Round(PreviewBox.y + pg / 2 + (z[2] + z[4]) * ah - pg / 2)
-        ctl.Move(x1, y1, x2 - x1, y2 - y1)
-        ctl.Visible := true
-        ctl.Redraw()
+    for i, t in SetTiles
+        StyleTile(t, i = LayoutIndex)
+    for p in SetGapPills {
+        on := p.v = Gap
+        p.ctl.Opt("+Background" (on ? C_Accent : C_Card))
+        p.ctl.SetFont(on ? "bold c" C_Bg : "norm c" C_Text)
+        p.ctl.Redraw()
     }
 }
 
