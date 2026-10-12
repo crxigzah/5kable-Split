@@ -1,12 +1,19 @@
-# Builds the exe, portable zip and installer on a Windows runner.
-# Run it from the Actions tab, or push a tag like v1.0.1 to also attach the
-# files to a GitHub release.
+# Builds the exe, portable zip and installer on a Windows runner and
+# publishes them as a GitHub release tagged with the AppVersion from
+# src/5kableSplit.ahk. Bump the version and push to main to ship a release;
+# https://5kable.net/split always links to the latest one.
 name: Build
 
 on:
   workflow_dispatch:
   push:
-    tags: ['v*']
+    branches: [main]
+    paths:
+      - 'src/**'
+      - 'installer/**'
+      - 'assets/**'
+      - 'build.ps1'
+      - '.github/workflows/build.yml'
 
 permissions:
   contents: write
@@ -16,10 +23,17 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Read version
+        id: ver
+        shell: pwsh
+        run: |
+          $v = [regex]::Match((Get-Content src/5kableSplit.ahk -Raw), 'AppVersion := "([^"]+)"').Groups[1].Value
+          if (-not $v) { throw 'AppVersion not found in src/5kableSplit.ahk' }
+          "version=$v" >> $env:GITHUB_OUTPUT
       - name: Build
         shell: pwsh
         run: ./build.ps1
-      # Fixed-name copies so https://5kable.net/split can always link to
+      # Fixed-name copies so the website can always link to
       # releases/latest/download/<name> without knowing the version
       - name: Add latest-version aliases
         shell: pwsh
@@ -31,7 +45,10 @@ jobs:
           name: 5kable-Split
           path: dist/*
       - name: Release
-        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ steps.ver.outputs.version }}
+          target_commitish: ${{ github.sha }}
+          name: 5kable Split ${{ steps.ver.outputs.version }}
+          make_latest: true
           files: dist/*

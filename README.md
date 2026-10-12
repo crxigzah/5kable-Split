@@ -17,7 +17,7 @@ On a Windows PC, double-click **`build.cmd`**. The first build:
 
 When it's done, the `dist` folder opens. That setup exe is the file you hand out.
 
-If you push this folder to a GitHub repo, `.github/workflows/build.yml` builds the same files in GitHub Actions. Push a tag like `v1.0.1` and it attaches them to a GitHub release. The download button on 5kable.net/split always points at the latest release.
+Every push to `main` that touches the app also builds the same files in GitHub Actions (`.github/workflows/build.yml`) and publishes them as a GitHub release tagged with the app version. The download button on 5kable.net/split always points at the latest release.
 
 ## What the installer does
 
@@ -46,8 +46,7 @@ Built-in layouts: 50/50, 60/40, 40/60, three columns, 25/50/25, left half + righ
 ## Releasing a new version
 
 1. Change `AppVersion` and the `;@Ahk2Exe-SetVersion` line at the top of `src\5kableSplit.ahk`.
-2. Commit, then tag and push: `git tag v1.0.1 && git push origin main v1.0.1`.
-3. GitHub Actions builds the installer and publishes the release, and 5kable.net/split picks it up automatically.
+2. Commit and push to `main`. GitHub Actions builds the installer and publishes release `v<version>`, and 5kable.net/split picks it up automatically.
 
 ## Project layout
 
