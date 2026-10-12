@@ -8,7 +8,7 @@
 ;@Ahk2Exe-SetName Wideside
 ;@Ahk2Exe-SetProductName Wideside
 ;@Ahk2Exe-SetDescription Wideside
-;@Ahk2Exe-SetVersion 1.3.0
+;@Ahk2Exe-SetVersion 1.3.1
 ;@Ahk2Exe-SetCompanyName Wideside
 ;@Ahk2Exe-SetCopyright Copyright 2026 Wideside
 ;@Ahk2Exe-SetOrigFilename Wideside.exe
@@ -24,7 +24,7 @@ DllCall("SetThreadDpiAwarenessContext", "ptr", -4, "ptr")
 CoordMode "Mouse", "Screen"
 
 global AppName := "Wideside"
-global AppVersion := "1.3.0"
+global AppVersion := "1.3.1"
 global AppUrl := "https://crxigzah.github.io/wideside/"
 
 ; Settings live in %AppData% so it works when installed to Program Files.
@@ -50,7 +50,7 @@ global GapOptions := [0, 4, 8, 12, 16, 24]
 
 global Layouts := []
 global LayoutIndex := 1
-global Gap := 8
+global Gap := 0
 global RequireShift := true
 global ZoneOf := Map()          ; hwnd -> {idx, x, y, w, h} of the last snap
 
@@ -125,7 +125,7 @@ WriteDefaultSettings() {
 ; Layout number (built-in layouts first, then your custom ones)
 Layout=1
 ; Gap in pixels around and between windows
-Gap=8
+Gap=0
 ; 1 = only show zones / snap when Shift is held while dragging, 0 = every drag
 RequireShift=1
 
@@ -158,7 +158,7 @@ LoadSettings() {
     LayoutIndex := ReadInt("Layout", 1)
     if LayoutIndex < 1 || LayoutIndex > Layouts.Length
         LayoutIndex := 1
-    Gap := Max(0, ReadInt("Gap", 8))
+    Gap := Max(0, ReadInt("Gap", 0))
     RequireShift := ReadInt("RequireShift", 1) != 0
 }
 
@@ -636,7 +636,7 @@ ShowSettings(*) {
     g.SetFont("s9 bold c" C_Muted)
     g.AddText("x24 y" y, "GAP BETWEEN WINDOWS")
     g.SetFont("s10 norm c" C_Text)
-    gaps := [], gapIdx := 3
+    gaps := [], gapIdx := 1
     for i, v in GapOptions {
         gaps.Push(v " px")
         if v = Gap
