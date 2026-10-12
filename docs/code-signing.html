@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Code signing policy · Wideside</title>
+<meta name="description" content="How Wideside's Windows releases are built and code-signed.">
+<meta name="theme-color" content="#101114">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<style>
+:root { --bg:#101114; --card:#1a1c21; --border:#2a2d35; --text:#f4f4f5; --muted:#9a9da8; --accent:#ff7a3d; }
+@media (prefers-color-scheme: light) {
+  :root { --bg:#fbfaf8; --card:#ffffff; --border:#e6e2db; --text:#18181b; --muted:#63636e; --accent:#f0611f; }
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:Inter,'Segoe UI',system-ui,sans-serif; line-height:1.65; -webkit-font-smoothing:antialiased; }
+.wrap { max-width:760px; margin:0 auto; padding:0 24px; }
+header { border-bottom:1px solid var(--border); }
+header .wrap { height:64px; display:flex; align-items:center; justify-content:space-between; }
+.brand { display:flex; align-items:center; gap:10px; font:700 19px 'Space Grotesk',Inter,sans-serif; letter-spacing:-.02em; text-decoration:none; color:inherit; }
+.brand img { width:30px; height:30px; }
+header a.back { color:var(--muted); font-size:14px; text-decoration:none; }
+header a.back:hover { color:var(--text); }
+main { padding:56px 0 80px; }
+h1 { font:700 clamp(30px,5vw,40px)/1.1 'Space Grotesk',Inter,sans-serif; letter-spacing:-.02em; margin-bottom:12px; }
+.lead { color:var(--muted); font-size:16px; margin-bottom:36px; }
+h2 { font:600 20px 'Space Grotesk',Inter,sans-serif; margin:36px 0 12px; }
+p, li { font-size:15px; color:var(--muted); }
+p + p, ul + p { margin-top:12px; }
+strong { color:var(--text); font-weight:600; }
+a { color:var(--accent); }
+ul { padding-left:20px; display:grid; gap:6px; }
+.notice { background:var(--card); border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:12px; padding:18px 20px; }
+.notice p { color:var(--text); }
+code { font-size:13px; background:var(--card); border:1px solid var(--border); border-radius:5px; padding:1px 6px; }
+footer { border-top:1px solid var(--border); padding:28px 0; font-size:13px; color:var(--muted); }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <a class="brand" href="./"><img src="logo.svg" alt="">Wideside</a>
+    <a class="back" href="./">← Back to home</a>
+  </div>
+</header>
+<main>
+  <div class="wrap">
+    <h1>Code signing policy</h1>
+    <p class="lead">How Wideside's Windows releases are built, checked and signed.</p>
+
+    <div class="notice">
+      <p>Free code signing provided by <a href="https://about.signpath.io/">SignPath.io</a>, certificate by <a href="https://signpath.org/">SignPath Foundation</a>.</p>
+    </div>
+
+    <h2>What gets signed</h2>
+    <p>Only binaries built from the source code in the <a href="https://github.com/crxigzah/wideside">crxigzah/wideside</a> repository are signed: <code>Wideside.exe</code> and the installer <code>Wideside-Setup-&lt;version&gt;.exe</code>. Every release is built automatically by GitHub Actions from the <code>main</code> branch, so each signed file can be traced back to the exact commit it was built from.</p>
+
+    <h2>Team roles and their members</h2>
+    <ul>
+      <li><strong>Committers and reviewers:</strong> <a href="https://github.com/crxigzah">@crxigzah</a></li>
+      <li><strong>Approvers:</strong> <a href="https://github.com/crxigzah">@crxigzah</a></li>
+    </ul>
+    <p>Every signing request is approved manually by an approver before a release is published.</p>
+
+    <h2>Privacy policy</h2>
+    <p>This program will not transfer any information to other networked systems unless specifically requested by the user or the person installing or operating it.</p>
+    <p>Wideside has no telemetry, accounts or analytics. Its only network action is opening this website in your browser when you click the Website link in its About window. Settings are stored locally in <code>%AppData%\Wideside</code>.</p>
+
+    <h2>Licenses</h2>
+    <p>Wideside is open source under the <a href="https://github.com/crxigzah/wideside/blob/main/LICENSE">MIT License</a>. Third-party components used in the release builds are listed in <a href="https://github.com/crxigzah/wideside/blob/main/THIRD-PARTY-NOTICES.md">THIRD-PARTY-NOTICES.md</a>.</p>
+  </div>
+</main>
+<footer>
+  <div class="wrap">© 2026 Wideside · <a href="./">Home</a> · <a href="https://github.com/crxigzah/wideside">Source code</a></div>
+</footer>
+</body>
+</html>
