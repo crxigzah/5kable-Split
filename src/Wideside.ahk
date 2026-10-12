@@ -8,7 +8,7 @@
 ;@Ahk2Exe-SetName Wideside
 ;@Ahk2Exe-SetProductName Wideside
 ;@Ahk2Exe-SetDescription Wideside
-;@Ahk2Exe-SetVersion 1.4.0
+;@Ahk2Exe-SetVersion 1.5.0
 ;@Ahk2Exe-SetCompanyName Wideside
 ;@Ahk2Exe-SetCopyright Copyright 2026 Wideside
 ;@Ahk2Exe-SetOrigFilename Wideside.exe
@@ -24,7 +24,7 @@ DllCall("SetThreadDpiAwarenessContext", "ptr", -4, "ptr")
 CoordMode "Mouse", "Screen"
 
 global AppName := "Wideside"
-global AppVersion := "1.4.0"
+global AppVersion := "1.5.0"
 global AppUrl := "https://crxigzah.github.io/wideside/"
 
 ; Settings live in %AppData% so it works when installed to Program Files.
@@ -53,12 +53,18 @@ global LayoutIndex := 1
 global Gap := 0
 global RequireShift := false
 global PauseWinSnap := true
+global RememberApps := true
+global CheckUpdates := true
+global Paused := false
+global LatestVersion := ""      ; set when a newer release is found
 global OrigWinSnap := -1        ; Windows Snap setting from before we paused it
 global ZoneOf := Map()          ; hwnd -> {idx, x, y, w, h} of the last snap
 
 global OverlayCache := Map(), OverlayMon := 0, OverlayHi := -1
 global HotFill := 0, HotFrame := 0, HotLines := []
-global Drag := 0                ; drag in progress: {hwnd, sx, sy, shown, zone, mon, viaMouse}
+global Drag := 0                ; drag in progress: {hwnd, sx, sy, shown, sel, mon, viaMouse}
+; How close to the line between two zones counts as "on the line" (spans both)
+global SpanPx := Round(40 * A_ScreenDPI / 96)
 global WatchHwnd := 0, WatchX := 0, WatchY := 0, LastShift := 0
 global SettingsGui := 0, AboutGui := 0
 
@@ -86,6 +92,13 @@ global MoveSizeHook := DllCall("SetWinEventHook", "uint", 0x000A, "uint", 0x000B
 
 ApplyWinSnap()
 OnExit RestoreWinSnap
+
+; Hear about new windows, so apps can reopen in their remembered zone
+DllCall("RegisterShellHookWindow", "ptr", A_ScriptHwnd)
+OnMessage DllCall("RegisterWindowMessage", "str", "SHELLHOOK", "uint"), OnShellMessage
+
+if CheckUpdates
+    SetTimer CheckForUpdates, -8000
 OnMessage 0x7E, (*) => InvalidateOverlays()   ; WM_DISPLAYCHANGE: resolution or monitors changed
 
 if FirstRun
@@ -98,6 +111,8 @@ else
 #!Up::    MaximiseActive()
 #!l::     NextLayout()
 #!z::     PreviewZones()
+#!a::     ArrangeAll()
+#!p::     TogglePause()
 
 ; Track the left mouse button so tabs pulled off a browser's tab bar can
 ; snap too (see WatchMouseDrag). ~ lets the click through as normal.
@@ -128,6 +143,10 @@ Gap=0
 RequireShift=0
 ; 1 = turn off Windows' own Snap while Wideside is running
 PauseWindowsSnap=1
+; 1 = apps reopen in the zone they were last snapped to
+RememberAppZones=1
+; 1 = check GitHub for new versions every few hours
+CheckForUpdates=1
 SettingsVersion=2
 
 [CustomLayouts]
@@ -141,7 +160,7 @@ SettingsVersion=2
 }
 
 LoadSettings() {
-    global Layouts, LayoutIndex, Gap, RequireShift, PauseWinSnap
+    global Layouts, LayoutIndex, Gap, RequireShift, PauseWinSnap, RememberApps, CheckUpdates
     Layouts := BuiltInLayouts.Clone()
 
     try {
@@ -162,6 +181,8 @@ LoadSettings() {
     Gap := Max(0, ReadInt("Gap", 0))
     RequireShift := ReadInt("RequireShift", 0) != 0
     PauseWinSnap := ReadInt("PauseWindowsSnap", 1) != 0
+    RememberApps := ReadInt("RememberAppZones", 1) != 0
+    CheckUpdates := ReadInt("CheckForUpdates", 1) != 0
     ; Settings saved before 1.4 switch to Easy Arrange behaviour: zones on
     ; every drag and no gap
     if ReadInt("SettingsVersion", 1) < 2 {
@@ -180,6 +201,8 @@ SaveSettings() {
     IniWrite Gap, IniFile, "Settings", "Gap"
     IniWrite RequireShift ? 1 : 0, IniFile, "Settings", "RequireShift"
     IniWrite PauseWinSnap ? 1 : 0, IniFile, "Settings", "PauseWindowsSnap"
+    IniWrite RememberApps ? 1 : 0, IniFile, "Settings", "RememberAppZones"
+    IniWrite CheckUpdates ? 1 : 0, IniFile, "Settings", "CheckForUpdates"
     IniWrite 2, IniFile, "Settings", "SettingsVersion"
 }
 
@@ -234,6 +257,42 @@ ZoneRect(mon, z) {
     return {x: x1, y: y1, w: x2 - x1, h: y2 - y1}
 }
 
+; Zones under the point. Near the line between zones the neighbouring zones
+; count too, so dropping on a line spans them (and near a corner where four
+; zones meet, all four).
+ZonesAtPoint(mon, x, y) {
+    MonitorGetWorkArea mon, &L, &T, &R, &B
+    W := R - L, H := B - T, sel := []
+    for i, z in CurrentZones() {
+        zx1 := L + z[1] * W, zy1 := T + z[2] * H
+        zx2 := zx1 + z[3] * W, zy2 := zy1 + z[4] * H
+        dx := Max(zx1 - x, 0, x - zx2), dy := Max(zy1 - y, 0, y - zy2)
+        if dx <= SpanPx && dy <= SpanPx
+            sel.Push(i)
+    }
+    return sel
+}
+
+; Bounding rect of several zones, gaps included, for spanning
+UnionRect(mon, sel) {
+    zones := CurrentZones()
+    for i in sel {
+        r := ZoneRect(mon, zones[i])
+        if A_Index = 1
+            x1 := r.x, y1 := r.y, x2 := r.x + r.w, y2 := r.y + r.h
+        else
+            x1 := Min(x1, r.x), y1 := Min(y1, r.y), x2 := Max(x2, r.x + r.w), y2 := Max(y2, r.y + r.h)
+    }
+    return {x: x1, y: y1, w: x2 - x1, h: y2 - y1}
+}
+
+JoinZones(sel) {
+    out := ""
+    for i in sel
+        out .= (A_Index > 1 ? "," : "") i
+    return out
+}
+
 ZoneAtPoint(mon, x, y) {
     MonitorGetWorkArea mon, &L, &T, &R, &B
     fx := (x - L) / (R - L), fy := (y - T) / (B - T)
@@ -283,14 +342,100 @@ MoveWindowTo(hwnd, r) {
         WinMove nx, ny, nw, nh, hwnd
 }
 
-SnapToZone(hwnd, mon, idx) {
-    zones := CurrentZones()
-    if !IsSnappable(hwnd) || idx < 1 || idx > zones.Length
+SnapToZone(hwnd, mon, idx) => SnapToZones(hwnd, mon, [idx])
+
+; Snap to one zone, or several spanned together
+SnapToZones(hwnd, mon, sel) {
+    n := CurrentZones().Length
+    if !IsSnappable(hwnd) || !sel.Length
+        return
+    for i in sel
+        if i < 1 || i > n
+            return
+    try {
+        MoveWindowTo(hwnd, UnionRect(mon, sel))
+        WinGetPos &x, &y, &w, &h, hwnd
+        ZoneOf[hwnd] := {idx: sel[1], x: x, y: y, w: w, h: h}
+        RememberZone(hwnd, mon, sel)
+    }
+}
+
+; A normal, visible app window: not a dialog, tool window, minimised,
+; hidden or a background (cloaked) store app
+IsAppWindow(hwnd) {
+    if !IsSnappable(hwnd) || WinGetMinMax(hwnd) = -1 || WinGetTitle(hwnd) = ""
+        return false
+    if !(WinGetStyle(hwnd) & 0x10000000) || (WinGetExStyle(hwnd) & 0x80)
+        return false
+    if DllCall("GetWindow", "ptr", hwnd, "uint", 4, "ptr")   ; owned window, e.g. a dialog
+        return false
+    cloaked := 0
+    DllCall("dwmapi\DwmGetWindowAttribute", "ptr", hwnd, "uint", 14, "int*", &cloaked, "uint", 4)
+    return !cloaked
+}
+
+; Fill the zones with the open windows on this monitor, most recently used first
+ArrangeAll(*) {
+    if hwnd := ActiveTarget()
+        mon := MonitorOfWindow(hwnd)
+    else {
+        MouseGetPos &mx, &my
+        mon := MonitorFromPoint(mx, my)
+    }
+    n := CurrentZones().Length, i := 0
+    for win in WinGetList() {
+        if i >= n
+            break
+        try {
+            if !IsAppWindow(win) || MonitorOfWindow(win) != mon
+                continue
+        } catch
+            continue
+        SnapToZone(win, mon, ++i)
+    }
+    ToolTip i ? "Arranged " i " window" (i = 1 ? "" : "s") : "No windows to arrange"
+    SetTimer () => ToolTip(), -1200
+}
+
+; ---------------------------------------------------------------- remembered app zones
+
+RememberZone(hwnd, mon, sel) {
+    if !RememberApps
+        return
+    try IniWrite LayoutIndex "|" mon "|" JoinZones(sel), IniFile, "AppZones", WinGetProcessName(hwnd)
+}
+
+OnShellMessage(wParam, lParam, *) {
+    if wParam = 1 && RememberApps && !Paused   ; HSHELL_WINDOWCREATED
+        SetTimer () => PlaceNewWindow(lParam), -400
+}
+
+; Put a newly opened app back in the zone it was last snapped to. Only when
+; it's the app's only window (so extra windows, tabs pulled off and dialogs
+; are left alone), nothing is being dragged, and the layout hasn't changed.
+PlaceNewWindow(hwnd) {
+    if Drag || GetKeyState("LButton", "P")
         return
     try {
-        MoveWindowTo(hwnd, ZoneRect(mon, zones[idx]))
-        WinGetPos &x, &y, &w, &h, hwnd
-        ZoneOf[hwnd] := {idx: idx, x: x, y: y, w: w, h: h}
+        if !IsAppWindow(hwnd)
+            return
+        exe := WinGetProcessName(hwnd)
+        parts := StrSplit(IniRead(IniFile, "AppZones", exe, ""), "|")
+        if parts.Length != 3 || Integer(parts[1]) != LayoutIndex
+            return
+        mon := Integer(parts[2])
+        if mon < 1 || mon > MonitorGetCount()
+            return
+        count := 0
+        for w in WinGetList("ahk_exe " exe)
+            if IsAppWindow(w)
+                count++
+        if count > 1
+            return
+        sel := []
+        for z in StrSplit(parts[3], ",")
+            sel.Push(Integer(z))
+        SnapToZones(hwnd, mon, sel)
     }
 }
 
@@ -333,7 +478,7 @@ OnMoveSize(hHook, event, hwnd, idObject, idChild, idThread, time) {
         return
     if event = 0x000A {
         ; The same event fires when resizing; the sizing cursor gives that away
-        if IsSnappable(hwnd) && !(A_Cursor ~= "^Size(NS|WE|NWSE|NESW)$")
+        if !Paused && IsSnappable(hwnd) && !(A_Cursor ~= "^Size(NS|WE|NWSE|NESW)$")
             BeginDrag(hwnd, false)
     } else if event = 0x000B && Drag && Drag.hwnd = hwnd && !Drag.viaMouse
         EndDrag(10)
@@ -342,7 +487,7 @@ OnMoveSize(hHook, event, hwnd, idObject, idChild, idThread, time) {
 BeginDrag(hwnd, viaMouse) {
     global Drag
     MouseGetPos &x, &y
-    Drag := {hwnd: hwnd, sx: x, sy: y, shown: false, zone: 0, mon: 0, viaMouse: viaMouse}
+    Drag := {hwnd: hwnd, sx: x, sy: y, shown: false, sel: [], mon: 0, viaMouse: viaMouse}
     SetTimer DragTick, 15
 }
 
@@ -351,11 +496,11 @@ EndDrag(delay) {
     SetTimer DragTick, 0
     if !Drag
         return
-    hwnd := Drag.hwnd, zone := Drag.zone, mon := Drag.mon
+    hwnd := Drag.hwnd, sel := Drag.sel, mon := Drag.mon
     Drag := 0
     HideOverlay()
-    if zone && !GetKeyState("Ctrl", "P")
-        SetTimer () => SnapToZone(hwnd, mon, zone), -delay
+    if sel.Length && !GetKeyState("Ctrl", "P")
+        SetTimer () => SnapToZones(hwnd, mon, sel), -delay
 }
 
 DragTick() {
@@ -378,15 +523,15 @@ DragTick() {
     ; Ctrl = place freely. In Shift mode, a short grace period means letting
     ; go of Shift a moment before the mouse button still snaps.
     if GetKeyState("Ctrl", "P") || (RequireShift && A_TickCount - LastShift > 250) {
-        Drag.zone := 0
+        Drag.sel := []
         HideOverlay()
         return
     }
     Drag.shown := true
     mon := MonitorFromPoint(mx, my)
-    zone := ZoneAtPoint(mon, mx, my)
-    ShowOverlay(mon, zone)
-    Drag.zone := zone, Drag.mon := mon
+    sel := ZonesAtPoint(mon, mx, my)
+    ShowOverlay(mon, sel)
+    Drag.sel := sel, Drag.mon := mon
 }
 
 ; Chrome, Edge, Opera and other Chromium browsers move a torn-off tab's new
@@ -394,7 +539,7 @@ DragTick() {
 ; active browser window move while the mouse button is held.
 WatchMouseDrag() {
     global WatchHwnd, WatchX, WatchY
-    if Drag
+    if Drag || Paused
         return
     win := WinExist("A")
     try {
@@ -417,7 +562,7 @@ WatchMouseDrag() {
 ; the zone under the mouse gets a thick outline and a light tint. The windows
 ; are built once per monitor and then just shown and hidden, so dragging
 ; stays smooth.
-ShowOverlay(mon, hi) {
+ShowOverlay(mon, sel) {
     global OverlayMon, OverlayHi
     EnsureHotWindows()
     if mon != OverlayMon {
@@ -428,15 +573,15 @@ ShowOverlay(mon, hi) {
             f.Show("NA")
         OverlayMon := mon, OverlayHi := -1
     }
-    if hi = OverlayHi
+    key := JoinZones(sel)
+    if key == OverlayHi
         return
-    OverlayHi := hi
-    rects := OverlayCache[mon].rects
-    if hi < 1 || hi > rects.Length {
+    OverlayHi := key
+    if !sel.Length {
         HotFill.Hide(), HotFrame.Hide()
         return
     }
-    r := rects[hi], t := 6
+    r := UnionRect(mon, sel), t := 6
     HotLines[1].Move(0, 0, r.w, t)
     HotLines[2].Move(0, r.h - t, r.w, t)
     HotLines[3].Move(0, 0, t, r.h)
@@ -509,7 +654,7 @@ InvalidateOverlays() {
 PreviewZones(*) {
     MouseGetPos &mx, &my
     HideOverlay()
-    ShowOverlay(MonitorFromPoint(mx, my), 0)
+    ShowOverlay(MonitorFromPoint(mx, my), [])
     SetTimer HideOverlay, -1500
 }
 
@@ -558,7 +703,8 @@ ApplyWinSnap() {
         DllCall("SystemParametersInfo", "uint", 0x0082, "uint", 0, "int*", &v, "uint", 0)
         OrigWinSnap := v
     }
-    DllCall("SystemParametersInfo", "uint", 0x0083, "uint", PauseWinSnap ? 0 : OrigWinSnap, "ptr", 0, "uint", 2)
+    ; While Wideside is paused, Windows Snap is allowed back
+    DllCall("SystemParametersInfo", "uint", 0x0083, "uint", (PauseWinSnap && !Paused) ? 0 : OrigWinSnap, "ptr", 0, "uint", 2)
 }
 
 RestoreWinSnap(*) {
@@ -571,6 +717,93 @@ SetPauseWinSnap(on) {
     PauseWinSnap := on
     SaveSettings()
     ApplyWinSnap()
+}
+
+TogglePause(*) {
+    global Paused
+    Paused := !Paused
+    ApplyWinSnap()
+    BuildTrayMenu()
+    ToolTip Paused ? "Wideside paused" : "Wideside on"
+    SetTimer () => ToolTip(), -1200
+}
+
+SetRememberApps(on) {
+    global RememberApps
+    RememberApps := on
+    SaveSettings()
+}
+
+SetCheckUpdates(on) {
+    global CheckUpdates
+    CheckUpdates := on
+    SaveSettings()
+    if on
+        SetTimer CheckForUpdates, -1000
+}
+
+; ---------------------------------------------------------------- updates
+
+; Ask GitHub for the latest release without blocking the script; PollUpdate
+; picks up the answer. Repeats every 6 hours while the setting is on.
+global UpdateReq := 0, UpdateManual := false
+
+CheckForUpdates(manual := false, *) {
+    global UpdateReq, UpdateManual
+    if UpdateReq
+        return
+    UpdateManual := manual
+    try {
+        UpdateReq := ComObject("WinHttp.WinHttpRequest.5.1")
+        UpdateReq.Open("GET", "https://api.github.com/repos/crxigzah/wideside/releases/latest", true)
+        UpdateReq.SetRequestHeader("User-Agent", "Wideside/" AppVersion)
+        UpdateReq.Send()
+        SetTimer PollUpdate, 500
+    } catch
+        UpdateReq := 0
+    if CheckUpdates
+        SetTimer CheckForUpdates, -6 * 60 * 60 * 1000
+}
+
+PollUpdate() {
+    global UpdateReq, LatestVersion
+    static waited := 0
+    found := false
+    try {
+        if !UpdateReq.WaitForResponse(0) {
+            if (waited += 500) < 20000
+                return
+            throw Error("No response")
+        }
+        if UpdateReq.Status = 200 && RegExMatch(UpdateReq.ResponseText, '"tag_name"\s*:\s*"v?([\d.]+)"', &m)
+            && VerCompare(m[1], AppVersion) > 0 {
+            found := true
+            if m[1] != LatestVersion {
+                LatestVersion := m[1]
+                BuildTrayMenu()
+                TrayTip "Version " LatestVersion " is available. Click the tray icon's Update option to install it.", AppName
+            }
+        }
+    }
+    SetTimer PollUpdate, 0
+    UpdateReq := 0, waited := 0
+    if UpdateManual && !found
+        MsgBox "You're on the latest version (" AppVersion ").", AppName, "Iconi"
+}
+
+; Download the new installer and run it. It closes this copy, upgrades in
+; place and offers to relaunch.
+InstallUpdate(*) {
+    file := A_Temp "\Wideside-Setup.exe"
+    try {
+        ToolTip "Downloading Wideside " LatestVersion "..."
+        Download "https://github.com/crxigzah/wideside/releases/latest/download/Wideside-Setup.exe", file
+        ToolTip()
+        Run '"' file '"'
+    } catch {
+        ToolTip()
+        Run "https://github.com/crxigzah/wideside/releases/latest"
+    }
 }
 
 StartupLink() => A_Startup "\" AppName ".lnk"
@@ -650,12 +883,15 @@ ShowAbout(welcome := false, *) {
 
     keys := [
         ["Drag a window",      "Show zones, drop to snap"],
+        ["Drop on a line",     "Span both zones"],
         ["Ctrl + drag",        "Move freely, no snapping"],
         ["Win+Alt+Left/Right", "Previous / next zone"],
         ["Win+Alt+1 to 9",     "Snap to zone number"],
         ["Win+Alt+Up",         "Maximise across the screen"],
+        ["Win+Alt+A",          "Arrange all windows"],
         ["Win+Alt+L",          "Next layout"],
-        ["Win+Alt+Z",          "Show zones"]
+        ["Win+Alt+Z",          "Show zones"],
+        ["Win+Alt+P",          "Pause / resume snapping"]
     ]
     for k in keys {
         g.SetFont("s10 bold c" C_Accent)
@@ -739,9 +975,11 @@ ShowSettings(*) {
     y += 68
     AddToggle(g, y, "Only show zones while holding Shift", RequireShift, SetRequireShift)
     AddToggle(g, y + 28, "Turn off Windows Snap while Wideside runs", PauseWinSnap, SetPauseWinSnap)
-    AddToggle(g, y + 56, "Start Wideside with Windows", FileExist(StartupLink()) != "", SetStartup)
+    AddToggle(g, y + 56, "Reopen apps in the zone they were last snapped to", RememberApps, SetRememberApps)
+    AddToggle(g, y + 84, "Check for updates automatically", CheckUpdates, SetCheckUpdates)
+    AddToggle(g, y + 112, "Start Wideside with Windows", FileExist(StartupLink()) != "", SetStartup)
 
-    y += 100
+    y += 156
     g.SetFont("s9 c" C_Accent)
     custom := g.AddText("x24 y" (y + 8) " w220", "Edit custom layouts...")
     custom.OnEvent("Click", EditCustomLayouts)
@@ -799,12 +1037,20 @@ BuildTrayMenu() {
     }
     tray.Add("Layout", layoutMenu)
     tray.Add("Show zones`tWin+Alt+Z", PreviewZones)
+    tray.Add("Arrange all windows`tWin+Alt+A", ArrangeAll)
+    tray.Add("Pause snapping`tWin+Alt+P", TogglePause)
+    if Paused
+        tray.Check("Pause snapping`tWin+Alt+P")
     tray.Add()
+    if LatestVersion
+        tray.Add("Update to version " LatestVersion, InstallUpdate)
+    else
+        tray.Add("Check for updates", CheckForUpdates.Bind(true))
     tray.Add("About and hotkeys", ShowAbout.Bind(false))
     tray.Add("Reload", (*) => Reload())
     tray.Add("Exit", (*) => ExitApp())
     tray.Default := "Settings"
     tray.ClickCount := 1
 
-    A_IconTip := AppName " - " Layouts[LayoutIndex].name
+    A_IconTip := AppName " - " (Paused ? "paused" : Layouts[LayoutIndex].name)
 }

@@ -11,13 +11,18 @@ Wideside was made for the MSI MAG C42CQR E2, but it works on any monitor. It rea
 | Action | What it does |
 |---|---|
 | Drag a window | Shows the zones. The one under the mouse lights up orange; let go to snap. |
+| Drop on the line between zones | Spans both zones (all four near a corner where four meet) |
 | **Ctrl** + drag | Moves the window freely without snapping |
 | Pull a browser tab off the tab bar | Same as above: drop it on a zone and the tab becomes its own window in that zone (Chrome, Edge, Opera, Brave). |
 | **Win+Alt+Left / Right** | Moves the active window to the previous / next zone |
 | **Win+Alt+1 to 9** | Moves the active window to that zone number |
 | **Win+Alt+Up** | Maximises across the whole monitor |
+| **Win+Alt+A** | Arranges all open windows on the monitor into the zones, most recent first |
 | **Win+Alt+L** | Next layout |
 | **Win+Alt+Z** | Shows the zone numbers |
+| **Win+Alt+P** | Pauses / resumes snapping (Windows Snap comes back while paused) |
+
+Apps reopen in the zone they were last snapped to, as long as it's their only window and the layout hasn't changed. Wideside checks GitHub for new versions every few hours; when one is out, **Update** in the tray menu downloads and installs it. Both can be turned off in Settings.
 
 Click the tray icon to open **Settings**. In there you can pick a layout (with a live preview), choose the gap size, require Shift to show zones if you prefer, pause Windows' own Snap while Wideside runs (on by default, so the two don't fight), and set it to start with Windows.
 
