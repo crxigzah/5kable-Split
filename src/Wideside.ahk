@@ -8,7 +8,7 @@
 ;@Ahk2Exe-SetName Wideside
 ;@Ahk2Exe-SetProductName Wideside
 ;@Ahk2Exe-SetDescription Wideside
-;@Ahk2Exe-SetVersion 1.3.1
+;@Ahk2Exe-SetVersion 1.4.0
 ;@Ahk2Exe-SetCompanyName Wideside
 ;@Ahk2Exe-SetCopyright Copyright 2026 Wideside
 ;@Ahk2Exe-SetOrigFilename Wideside.exe
@@ -24,7 +24,7 @@ DllCall("SetThreadDpiAwarenessContext", "ptr", -4, "ptr")
 CoordMode "Mouse", "Screen"
 
 global AppName := "Wideside"
-global AppVersion := "1.3.1"
+global AppVersion := "1.4.0"
 global AppUrl := "https://crxigzah.github.io/wideside/"
 
 ; Settings live in %AppData% so it works when installed to Program Files.
@@ -51,12 +51,15 @@ global GapOptions := [0, 4, 8, 12, 16, 24]
 global Layouts := []
 global LayoutIndex := 1
 global Gap := 0
-global RequireShift := true
+global RequireShift := false
+global PauseWinSnap := true
+global OrigWinSnap := -1        ; Windows Snap setting from before we paused it
 global ZoneOf := Map()          ; hwnd -> {idx, x, y, w, h} of the last snap
 
-global Overlays := [], OverlayMon := 0, OverlayHi := -1, HotFill := 0
-global DragHwnd := 0, DragZone := 0, DragMon := 0, DragW := 0, DragH := 0
-global MouseDrag := false, WatchHwnd := 0, WatchX := 0, WatchY := 0
+global OverlayCache := Map(), OverlayMon := 0, OverlayHi := -1
+global HotFill := 0, HotFrame := 0, HotLines := []
+global Drag := 0                ; drag in progress: {hwnd, sx, sy, shown, zone, mon, viaMouse}
+global WatchHwnd := 0, WatchX := 0, WatchY := 0, LastShift := 0
 global SettingsGui := 0, AboutGui := 0
 
 ; ---------------------------------------------------------------- startup
@@ -81,6 +84,10 @@ global MoveSizeCB := CallbackCreate(OnMoveSize, , 7)
 global MoveSizeHook := DllCall("SetWinEventHook", "uint", 0x000A, "uint", 0x000B
     , "ptr", 0, "ptr", MoveSizeCB, "uint", 0, "uint", 0, "uint", 0, "ptr")
 
+ApplyWinSnap()
+OnExit RestoreWinSnap
+OnMessage 0x7E, (*) => InvalidateOverlays()   ; WM_DISPLAYCHANGE: resolution or monitors changed
+
 if FirstRun
     ShowAbout(true)
 else
@@ -92,28 +99,19 @@ else
 #!l::     NextLayout()
 #!z::     PreviewZones()
 
-; Track the left mouse button so drags that apps run themselves (see
-; WatchMouseDrag) can snap too. ~ lets the click through as normal.
+; Track the left mouse button so tabs pulled off a browser's tab bar can
+; snap too (see WatchMouseDrag). ~ lets the click through as normal.
 ~LButton:: {
-    global MouseDrag, WatchHwnd
-    MouseDrag := false, WatchHwnd := 0
+    global WatchHwnd
+    WatchHwnd := 0
     SetTimer WatchMouseDrag, 30
 }
 
 ~LButton Up:: {
-    global MouseDrag, DragHwnd
     SetTimer WatchMouseDrag, 0
-    if !MouseDrag
-        return
-    MouseDrag := false
-    SetTimer DragTick, 0
-    hwnd := DragHwnd, zone := DragZone, mon := DragMon
-    DragHwnd := 0
-    HideOverlay()
-    ; Slightly longer delay than a title-bar drag: browsers finish placing a
-    ; torn-off tab's window just after the button comes up.
-    if zone && (!RequireShift || GetKeyState("Shift", "P"))
-        SetTimer () => SnapToZone(hwnd, mon, zone), -80
+    ; Browsers finish placing a torn-off tab's window just after the button comes up
+    if Drag && Drag.viaMouse
+        EndDrag(80)
 }
 
 ; ---------------------------------------------------------------- settings
@@ -126,8 +124,11 @@ WriteDefaultSettings() {
 Layout=1
 ; Gap in pixels around and between windows
 Gap=0
-; 1 = only show zones / snap when Shift is held while dragging, 0 = every drag
-RequireShift=1
+; 1 = only show zones when Shift is held while dragging, 0 = every drag
+RequireShift=0
+; 1 = turn off Windows' own Snap while Wideside is running
+PauseWindowsSnap=1
+SettingsVersion=2
 
 [CustomLayouts]
 ; Add your own layouts here, then right-click the tray icon > Reload.
@@ -140,7 +141,7 @@ RequireShift=1
 }
 
 LoadSettings() {
-    global Layouts, LayoutIndex, Gap, RequireShift
+    global Layouts, LayoutIndex, Gap, RequireShift, PauseWinSnap
     Layouts := BuiltInLayouts.Clone()
 
     try {
@@ -159,7 +160,14 @@ LoadSettings() {
     if LayoutIndex < 1 || LayoutIndex > Layouts.Length
         LayoutIndex := 1
     Gap := Max(0, ReadInt("Gap", 0))
-    RequireShift := ReadInt("RequireShift", 1) != 0
+    RequireShift := ReadInt("RequireShift", 0) != 0
+    PauseWinSnap := ReadInt("PauseWindowsSnap", 1) != 0
+    ; Settings saved before 1.4 switch to Easy Arrange behaviour: zones on
+    ; every drag and no gap
+    if ReadInt("SettingsVersion", 1) < 2 {
+        RequireShift := false, Gap := 0
+        SaveSettings()
+    }
 }
 
 ReadInt(key, default) {
@@ -171,6 +179,8 @@ SaveSettings() {
     IniWrite LayoutIndex, IniFile, "Settings", "Layout"
     IniWrite Gap, IniFile, "Settings", "Gap"
     IniWrite RequireShift ? 1 : 0, IniFile, "Settings", "RequireShift"
+    IniWrite PauseWinSnap ? 1 : 0, IniFile, "Settings", "PauseWindowsSnap"
+    IniWrite 2, IniFile, "Settings", "SettingsVersion"
 }
 
 ; "0,0,0.5,1 | 0.5,0,0.5,1" -> [[0,0,0.5,1], [0.5,0,0.5,1]]
@@ -316,133 +326,184 @@ MaximiseActive() {
 
 ; ---------------------------------------------------------------- drag to snap
 
+; A drag starts from Windows' own move event (title-bar drags) or from
+; WatchMouseDrag (browser tabs pulled off the tab bar). Both end in EndDrag.
 OnMoveSize(hHook, event, hwnd, idObject, idChild, idThread, time) {
-    global DragHwnd, DragZone, DragMon, DragW, DragH, MouseDrag
     if idObject != 0
         return
     if event = 0x000A {
-        if !IsSnappable(hwnd)
-            return
-        MouseDrag := false   ; a normal title-bar drag takes over
-        DragHwnd := hwnd, DragZone := 0, DragMon := 0
-        try WinGetPos , , &DragW, &DragH, hwnd
-        SetTimer DragTick, 25
-    } else if event = 0x000B && hwnd = DragHwnd {
-        SetTimer DragTick, 0
-        zone := DragZone, mon := DragMon
-        DragHwnd := 0
-        HideOverlay()
-        if zone && (!RequireShift || GetKeyState("Shift", "P"))
-            SetTimer () => SnapToZone(hwnd, mon, zone), -15
-    }
+        ; The same event fires when resizing; the sizing cursor gives that away
+        if IsSnappable(hwnd) && !(A_Cursor ~= "^Size(NS|WE|NWSE|NESW)$")
+            BeginDrag(hwnd, false)
+    } else if event = 0x000B && Drag && Drag.hwnd = hwnd && !Drag.viaMouse
+        EndDrag(10)
+}
+
+BeginDrag(hwnd, viaMouse) {
+    global Drag
+    MouseGetPos &x, &y
+    Drag := {hwnd: hwnd, sx: x, sy: y, shown: false, zone: 0, mon: 0, viaMouse: viaMouse}
+    SetTimer DragTick, 15
+}
+
+EndDrag(delay) {
+    global Drag
+    SetTimer DragTick, 0
+    if !Drag
+        return
+    hwnd := Drag.hwnd, zone := Drag.zone, mon := Drag.mon
+    Drag := 0
+    HideOverlay()
+    if zone && !GetKeyState("Ctrl", "P")
+        SetTimer () => SnapToZone(hwnd, mon, zone), -delay
 }
 
 DragTick() {
-    global DragZone, DragMon, DragHwnd
-    if !DragHwnd
+    global Drag, LastShift
+    if !Drag
         return
-    ; Resizing also fires the move event - ignore it if the size is changing.
-    try WinGetPos , , &w, &h, DragHwnd
-    catch {
-        DragHwnd := 0
+    if !WinExist(Drag.hwnd) {
+        SetTimer DragTick, 0
+        Drag := 0
         HideOverlay()
         return
     }
-    if w != DragW || h != DragH || (RequireShift && !GetKeyState("Shift", "P")) {
-        DragZone := 0
-        HideOverlay()
-        return
-    }
+    if GetKeyState("Shift", "P")
+        LastShift := A_TickCount
     MouseGetPos &mx, &my
+    ; Only show zones once the window is really being dragged, not on a
+    ; click of the title bar
+    if !Drag.shown && Abs(mx - Drag.sx) + Abs(my - Drag.sy) < 12
+        return
+    ; Ctrl = place freely. In Shift mode, a short grace period means letting
+    ; go of Shift a moment before the mouse button still snaps.
+    if GetKeyState("Ctrl", "P") || (RequireShift && A_TickCount - LastShift > 250) {
+        Drag.zone := 0
+        HideOverlay()
+        return
+    }
+    Drag.shown := true
     mon := MonitorFromPoint(mx, my)
     zone := ZoneAtPoint(mon, mx, my)
     ShowOverlay(mon, zone)
-    DragZone := zone, DragMon := mon
+    Drag.zone := zone, Drag.mon := mon
 }
 
-; Chrome, Edge and Opera move a torn-off tab's new window themselves instead
-; of using a normal title-bar drag, so no move event fires. Spot those by
-; watching the active window move while the mouse button is held.
+; Chrome, Edge, Opera and other Chromium browsers move a torn-off tab's new
+; window themselves, so no move event fires. Spot those by watching the
+; active browser window move while the mouse button is held.
 WatchMouseDrag() {
-    global MouseDrag, WatchHwnd, WatchX, WatchY, DragHwnd, DragZone, DragMon, DragW, DragH
-    if MouseDrag || DragHwnd   ; already tracking this drag
+    global WatchHwnd, WatchX, WatchY
+    if Drag
         return
     win := WinExist("A")
-    if !IsSnappable(win)
+    try {
+        if !IsSnappable(win) || WinGetClass(win) != "Chrome_WidgetWin_1"
+            return
+        WinGetPos &x, &y, , , win
+    } catch
         return
-    try WinGetPos &x, &y, &w, &h, win
-    catch
-        return
-    if win != WatchHwnd {      ; new active window (e.g. the torn-off tab) - start watching it
+    if win != WatchHwnd {      ; new active window (e.g. the torn-off tab): start watching it
         WatchHwnd := win, WatchX := x, WatchY := y
         return
     }
-    if x != WatchX || y != WatchY {
-        MouseDrag := true
-        DragHwnd := win, DragZone := 0, DragMon := 0, DragW := w, DragH := h
-        SetTimer DragTick, 25
-    }
+    if x != WatchX || y != WatchY
+        BeginDrag(win, true)
 }
 
 ; ---------------------------------------------------------------- overlay
 
-; Easy Arrange style: each zone is an orange outline with a number tag. The
-; zone under the mouse gets a thicker outline and a light orange tint.
+; Easy Arrange style: every zone is an orange outline with a number tag, and
+; the zone under the mouse gets a thick outline and a light tint. The windows
+; are built once per monitor and then just shown and hidden, so dragging
+; stays smooth.
 ShowOverlay(mon, hi) {
-    global Overlays, OverlayMon, OverlayHi, HotFill
-    if mon != OverlayMon || !Overlays.Length {
+    global OverlayMon, OverlayHi
+    EnsureHotWindows()
+    if mon != OverlayMon {
         HideOverlay()
-        HotFill := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x20 -DPIScale")
-        HotFill.BackColor := C_Accent
-        for i, z in CurrentZones() {
-            r := ZoneRect(mon, z)
-            ; The key colour is made fully transparent, so only the outline
-            ; and number tag are drawn
-            g := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x20 -DPIScale")
-            g.BackColor := "010203"
-            lines := []
-            Loop 4
-                lines.Push(g.AddText("x0 y0 w1 h1 Background" C_Accent))
-            g.SetFont("s11 bold c" C_Bg, "Segoe UI")
-            g.AddText("x14 y14 w30 h30 Center +0x200 Background" C_Accent, i)
-            g.Show("NA x" r.x " y" r.y " w" r.w " h" r.h)
-            WinSetTransColor "010203 235", g
-            o := {gui: g, lines: lines, w: r.w, h: r.h, rect: r}
-            SetZoneFrame(o, false)
-            Overlays.Push(o)
-        }
+        if !OverlayCache.Has(mon)
+            OverlayCache[mon] := BuildOverlay(mon)
+        for f in OverlayCache[mon].frames
+            f.Show("NA")
         OverlayMon := mon, OverlayHi := -1
     }
-    if hi != OverlayHi {
-        for i, o in Overlays
-            SetZoneFrame(o, i = hi)
-        if hi >= 1 && hi <= Overlays.Length {
-            r := Overlays[hi].rect
-            HotFill.Show("NA x" r.x " y" r.y " w" r.w " h" r.h)
-            WinSetTransparent 45, HotFill
-        } else
-            HotFill.Hide()
-        OverlayHi := hi
+    if hi = OverlayHi
+        return
+    OverlayHi := hi
+    rects := OverlayCache[mon].rects
+    if hi < 1 || hi > rects.Length {
+        HotFill.Hide(), HotFrame.Hide()
+        return
     }
+    r := rects[hi], t := 6
+    HotLines[1].Move(0, 0, r.w, t)
+    HotLines[2].Move(0, r.h - t, r.w, t)
+    HotLines[3].Move(0, 0, t, r.h)
+    HotLines[4].Move(r.w - t, 0, t, r.h)
+    HotFill.Show("NA x" r.x " y" r.y " w" r.w " h" r.h)
+    HotFrame.Show("NA x" r.x " y" r.y " w" r.w " h" r.h)
 }
 
-SetZoneFrame(o, hot) {
-    t := hot ? 6 : 2
-    o.lines[1].Move(0, 0, o.w, t)
-    o.lines[2].Move(0, o.h - t, o.w, t)
-    o.lines[3].Move(0, 0, t, o.h)
-    o.lines[4].Move(o.w - t, 0, t, o.h)
-    for l in o.lines
-        l.Redraw()
+BuildOverlay(mon) {
+    DetectHiddenWindows true
+    frames := [], rects := []
+    for i, z in CurrentZones() {
+        r := ZoneRect(mon, z), t := 2
+        ; The key colour is made fully transparent, so only the outline and
+        ; number tag are drawn
+        g := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x20 -DPIScale")
+        g.BackColor := "010203"
+        g.AddText("x0 y0 w" r.w " h" t " Background" C_Accent)
+        g.AddText("x0 y" (r.h - t) " w" r.w " h" t " Background" C_Accent)
+        g.AddText("x0 y0 w" t " h" r.h " Background" C_Accent)
+        g.AddText("x" (r.w - t) " y0 w" t " h" r.h " Background" C_Accent)
+        g.SetFont("s11 bold c" C_Bg, "Segoe UI")
+        g.AddText("x14 y14 w30 h30 Center +0x200 Background" C_Accent, i)
+        g.Show("Hide x" r.x " y" r.y " w" r.w " h" r.h)
+        WinSetTransColor "010203", g
+        frames.Push(g), rects.Push(r)
+    }
+    return {frames: frames, rects: rects}
+}
+
+; The highlight for the zone under the mouse: a tinted fill plus a thick
+; outline, moved from zone to zone rather than redrawn
+EnsureHotWindows() {
+    global HotFill, HotFrame, HotLines
+    if HotFill
+        return
+    DetectHiddenWindows true
+    HotFill := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x20 -DPIScale")
+    HotFill.BackColor := C_Accent
+    HotFill.Show("Hide x0 y0 w10 h10")
+    WinSetTransparent 45, HotFill
+    HotFrame := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x20 -DPIScale")
+    HotFrame.BackColor := "010203"
+    HotLines := []
+    Loop 4
+        HotLines.Push(HotFrame.AddText("x0 y0 w1 h1 Background" C_Accent))
+    HotFrame.Show("Hide x0 y0 w10 h10")
+    WinSetTransColor "010203", HotFrame
 }
 
 HideOverlay(*) {
-    global Overlays, OverlayMon, OverlayHi, HotFill
-    for o in Overlays
-        o.gui.Destroy()
-    if HotFill
-        HotFill.Destroy()
-    Overlays := [], OverlayMon := 0, OverlayHi := -1, HotFill := 0
+    global OverlayMon, OverlayHi
+    if !OverlayMon
+        return
+    for f in OverlayCache[OverlayMon].frames
+        f.Hide()
+    HotFill.Hide(), HotFrame.Hide()
+    OverlayMon := 0, OverlayHi := -1
+}
+
+; Throw away the cached zone windows after the layout, gap or displays change
+InvalidateOverlays() {
+    HideOverlay()
+    for mon, o in OverlayCache
+        for f in o.frames
+            f.Destroy()
+    OverlayCache.Clear()
 }
 
 PreviewZones(*) {
@@ -458,6 +519,7 @@ SetLayout(i, *) {
     global LayoutIndex
     LayoutIndex := i
     ZoneOf.Clear()
+    InvalidateOverlays()
     SaveSettings()
     BuildTrayMenu()
     RefreshSettings()
@@ -474,6 +536,7 @@ SetGap(g) {
     global Gap
     Gap := g
     ZoneOf.Clear()
+    InvalidateOverlays()
     SaveSettings()
     PreviewZones()
 }
@@ -482,6 +545,32 @@ SetRequireShift(on) {
     global RequireShift
     RequireShift := on
     SaveSettings()
+}
+
+; Windows' own Snap (edge snapping and the snap layout bar) competes with the
+; zones, so it can be paused while Wideside runs. Only the live setting is
+; changed, not the saved one, so it's back after signing in again even if
+; Wideside were to crash.
+ApplyWinSnap() {
+    global OrigWinSnap
+    if OrigWinSnap = -1 {
+        v := 0
+        DllCall("SystemParametersInfo", "uint", 0x0082, "uint", 0, "int*", &v, "uint", 0)
+        OrigWinSnap := v
+    }
+    DllCall("SystemParametersInfo", "uint", 0x0083, "uint", PauseWinSnap ? 0 : OrigWinSnap, "ptr", 0, "uint", 2)
+}
+
+RestoreWinSnap(*) {
+    if OrigWinSnap != -1
+        DllCall("SystemParametersInfo", "uint", 0x0083, "uint", OrigWinSnap, "ptr", 0, "uint", 2)
+}
+
+SetPauseWinSnap(on) {
+    global PauseWinSnap
+    PauseWinSnap := on
+    SaveSettings()
+    ApplyWinSnap()
 }
 
 StartupLink() => A_Startup "\" AppName ".lnk"
@@ -555,12 +644,13 @@ ShowAbout(welcome := false, *) {
     y := 108
     if welcome {
         g.SetFont("s10 c" C_Text)
-        g.AddText("x24 y" y " w" (W - 24), "Wideside is running in your system tray (bottom right, next to the clock). Drag any window while holding Shift and drop it on a zone.")
+        g.AddText("x24 y" y " w" (W - 24), "Wideside is running in your system tray (bottom right, next to the clock). Drag any window and drop it on a zone.")
         y += 60
     }
 
     keys := [
-        ["Shift + drag",       "Show zones, drop to snap"],
+        ["Drag a window",      "Show zones, drop to snap"],
+        ["Ctrl + drag",        "Move freely, no snapping"],
         ["Win+Alt+Left/Right", "Previous / next zone"],
         ["Win+Alt+1 to 9",     "Snap to zone number"],
         ["Win+Alt+Up",         "Maximise across the screen"],
@@ -647,10 +737,11 @@ ShowSettings(*) {
     gapDDL.OnEvent("Change", (c, *) => (SetGap(GapOptions[c.Value]), RefreshSettings()))
 
     y += 68
-    AddToggle(g, y, "Only snap when holding Shift while dragging", RequireShift, SetRequireShift)
-    AddToggle(g, y + 28, "Start Wideside with Windows", FileExist(StartupLink()) != "", SetStartup)
+    AddToggle(g, y, "Only show zones while holding Shift", RequireShift, SetRequireShift)
+    AddToggle(g, y + 28, "Turn off Windows Snap while Wideside runs", PauseWinSnap, SetPauseWinSnap)
+    AddToggle(g, y + 56, "Start Wideside with Windows", FileExist(StartupLink()) != "", SetStartup)
 
-    y += 72
+    y += 100
     g.SetFont("s9 c" C_Accent)
     custom := g.AddText("x24 y" (y + 8) " w220", "Edit custom layouts...")
     custom.OnEvent("Click", EditCustomLayouts)

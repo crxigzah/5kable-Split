@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Wideside · One big monitor, perfectly split</title>
-<meta name="description" content="Wideside is a free Windows app that splits an ultrawide or large monitor into window zones. Hold Shift, drag a window, drop it in. Like Dell Easy Arrange, for any monitor.">
+<meta name="description" content="Wideside is a free Windows app that splits an ultrawide or large monitor into window zones. Drag a window, drop it in. Like Dell Easy Arrange, for any monitor.">
 <meta property="og:title" content="Wideside · One big monitor, perfectly split">
 <meta property="og:description" content="Free Windows app that splits an ultrawide or large monitor into window zones, like Dell Easy Arrange.">
 <meta property="og:image" content="https://crxigzah.github.io/wideside/og.png">
@@ -188,7 +188,7 @@ footer a:hover { color: var(--text); }
     <div>
       <div class="pill">Free for Windows 10 &amp; 11</div>
       <h1>One big monitor,<br><em>perfectly split.</em></h1>
-      <p class="lead">Wideside snaps windows into side-by-side zones on ultrawide and large monitors. Hold Shift, drag a window, drop it in. Like Dell Easy Arrange, for any screen.</p>
+      <p class="lead">Wideside snaps windows into side-by-side zones on ultrawide and large monitors. Drag a window, drop it in. Like Dell Easy Arrange, for any screen.</p>
       <div class="actions">
         <a class="btn btn-primary" id="download" href="https://github.com/crxigzah/wideside/releases/latest/download/Wideside-Setup.exe">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.5 10.5 4.5v7H3zM11.5 4.4 21 3v8.5h-9.5zM3 12.5h7.5v7L3 18.5zM11.5 12.5H21V21l-9.5-1.4z"/></svg>
@@ -210,7 +210,7 @@ footer a:hover { color: var(--text); }
       </div>
       <div class="stand"></div>
       <div class="base"></div>
-      <div class="caption" id="caption">Hold <kbd>Shift</kbd> and drag</div>
+      <div class="caption" id="caption">Drag any window</div>
     </div>
   </div>
 </header>
@@ -226,7 +226,7 @@ footer a:hover { color: var(--text); }
       <div class="card">
         <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></svg></div>
         <h3>Drag to snap</h3>
-        <p>Hold Shift while dragging and the zones appear. The one under your mouse lights up; let go and the window fills it exactly.</p>
+        <p>Start dragging any window and the zones appear. The one under your mouse lights up; let go and the window fills it exactly. Hold Ctrl to place it freely.</p>
       </div>
       <div class="card">
         <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg></div>
@@ -275,7 +275,8 @@ footer a:hover { color: var(--text); }
       <h2>Hands stay on the keyboard</h2>
     </div>
     <div class="keys">
-      <div class="key"><span><kbd>Shift</kbd> + drag</span><span>Show zones, drop to snap</span></div>
+      <div class="key"><span>Drag a window</span><span>Show zones, drop to snap</span></div>
+      <div class="key"><span><kbd>Ctrl</kbd> + drag</span><span>Move freely, no snapping</span></div>
       <div class="key"><span><kbd>Win</kbd><kbd>Alt</kbd><kbd>←</kbd><kbd>→</kbd></span><span>Previous / next zone</span></div>
       <div class="key"><span><kbd>Win</kbd><kbd>Alt</kbd><kbd>1</kbd> to <kbd>9</kbd></span><span>Snap to zone number</span></div>
       <div class="key"><span><kbd>Win</kbd><kbd>Alt</kbd><kbd>↑</kbd></span><span>Maximise across the screen</span></div>
@@ -294,7 +295,7 @@ footer a:hover { color: var(--text); }
     <div class="faq">
       <details>
         <summary>Does Windows see it as two monitors?</summary>
-        <p>No, and neither does Dell Easy Arrange. Wideside snaps windows into zones on one display, so maximised windows, full-screen games and full-screen video still use the whole panel. Use Shift + drag or Win + Alt + arrows instead of maximising.</p>
+        <p>No, and neither does Dell Easy Arrange. Wideside snaps windows into zones on one display, so maximised windows, full-screen games and full-screen video still use the whole panel. Drag windows into zones or use Win + Alt + arrows instead of maximising.</p>
       </details>
       <details>
         <summary>Why does Windows say "Windows protected your PC"?</summary>
@@ -302,7 +303,7 @@ footer a:hover { color: var(--text); }
       </details>
       <details>
         <summary>Can I have browser tabs on each side?</summary>
-        <p>Yes, as separate browser windows. Drag a tab off the tab bar, press Shift while you're still dragging, and drop it on a zone. It becomes its own window filling that side, with its own tab bar. A browser's built-in split screen (like Opera's tab tiling) keeps one shared tab bar, because it's still one window.</p>
+        <p>Yes, as separate browser windows. Drag a tab off the tab bar and drop it on a zone. It becomes its own window filling that side, with its own tab bar. A browser's built-in split screen (like Opera's tab tiling) keeps one shared tab bar, because it's still one window.</p>
       </details>
       <details>
         <summary>Can I make my own layouts?</summary>
@@ -387,11 +388,11 @@ footer a:hover { color: var(--text); }
   function hot(i) { zones.forEach((z, j) => z.classList.toggle('hot', j === i)); }
   if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
     place(0, 50, 0);
-    cap.innerHTML = 'Hold <kbd>Shift</kbd>, drag, and drop into a zone';
+    cap.innerHTML = 'Drag a window and drop it into a zone';
     return;
   }
   const steps = [
-    () => { hot(-1); place(28, 36, 22); cap.innerHTML = 'Hold <kbd>Shift</kbd> and drag'; },
+    () => { hot(-1); place(28, 36, 22); cap.innerHTML = 'Drag any window'; },
     () => { hot(1); place(46, 36, 18); cap.innerHTML = 'Zone 2 lights up'; },
     () => { hot(-1); place(50, 50, 0); cap.innerHTML = 'Let go to snap'; },
     () => { cap.innerHTML = '<kbd>Win</kbd> <kbd>Alt</kbd> <kbd>←</kbd> to move it'; },

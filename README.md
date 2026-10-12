@@ -10,15 +10,16 @@ Wideside was made for the MSI MAG C42CQR E2, but it works on any monitor. It rea
 
 | Action | What it does |
 |---|---|
-| Hold **Shift** while dragging a window | Shows the zones. The one under the mouse lights up orange; let go to snap. |
-| Pull a browser tab off the tab bar, then hold **Shift** | Same as above: drop it on a zone and the tab becomes its own window in that zone (Chrome, Edge, Opera, Brave). |
+| Drag a window | Shows the zones. The one under the mouse lights up orange; let go to snap. |
+| **Ctrl** + drag | Moves the window freely without snapping |
+| Pull a browser tab off the tab bar | Same as above: drop it on a zone and the tab becomes its own window in that zone (Chrome, Edge, Opera, Brave). |
 | **Win+Alt+Left / Right** | Moves the active window to the previous / next zone |
 | **Win+Alt+1 to 9** | Moves the active window to that zone number |
 | **Win+Alt+Up** | Maximises across the whole monitor |
 | **Win+Alt+L** | Next layout |
 | **Win+Alt+Z** | Shows the zone numbers |
 
-Click the tray icon to open **Settings**. In there you can pick a layout (with a live preview), choose the gap size, turn the Shift requirement on or off, and set it to start with Windows.
+Click the tray icon to open **Settings**. In there you can pick a layout (with a live preview), choose the gap size, require Shift to show zones if you prefer, pause Windows' own Snap while Wideside runs (on by default, so the two don't fight), and set it to start with Windows.
 
 Built-in layouts: 50/50, 60/40, 40/60, three columns, 25/50/25, left half + right stacked, and four quarters. For your own layouts, go to Settings, click **Edit custom layouts**, then choose **Reload** from the tray menu.
 
