@@ -62,7 +62,12 @@ if (-not $Ahk2Exe) {
     if (-not $Ahk2Exe) { throw 'Ahk2Exe.exe not found in the download' }
 }
 
-# 3. Compile the exe (icon and version info come from the ;@Ahk2Exe lines in the script)
+# 3. Check the script for syntax / load-time errors (Ahk2Exe doesn't)
+Write-Host 'Validating script...'
+$check = & $AhkBase /ErrorStdOut /Validate $Src 2>&1 | Out-String
+if ($LASTEXITCODE -ne 0) { throw "Script has errors:`n$check" }
+
+# 4. Compile the exe (icon and version info come from the ;@Ahk2Exe lines in the script)
 $Exe = Join-Path $Dist '5kableSplit.exe'
 Remove-Item $Exe -ErrorAction SilentlyContinue
 Write-Host 'Compiling 5kableSplit.exe...'
@@ -70,12 +75,12 @@ $p = Start-Process $Ahk2Exe -Wait -PassThru -ArgumentList @(
     '/in', "`"$Src`"", '/out', "`"$Exe`"", '/base', "`"$AhkBase`"", '/silent', 'verbose')
 if ($p.ExitCode -ne 0 -or -not (Test-Path $Exe)) { throw "Ahk2Exe failed (exit code $($p.ExitCode))" }
 
-# 4. Portable zip
+# 5. Portable zip
 $Portable = Join-Path $Dist "5kableSplit-$Version-portable.zip"
 Remove-Item $Portable -ErrorAction SilentlyContinue
 Compress-Archive -Path $Exe -DestinationPath $Portable
 
-# 5. Installer
+# 6. Installer
 function Find-Iscc {
     $candidates = @(
         "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe",
