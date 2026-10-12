@@ -1,7 +1,7 @@
 # Builds the exe, portable zip and installer on a Windows runner and
 # publishes them as a GitHub release tagged with the AppVersion from
-# src/5kableSplit.ahk. Bump the version and push to main to ship a release;
-# https://5kable.net/split always links to the latest one.
+# src/Wideside.ahk. Bump the version and push to main to ship a release;
+# the website always links to the latest one.
 name: Build
 
 on:
@@ -27,8 +27,8 @@ jobs:
         id: ver
         shell: pwsh
         run: |
-          $v = [regex]::Match((Get-Content src/5kableSplit.ahk -Raw), 'AppVersion := "([^"]+)"').Groups[1].Value
-          if (-not $v) { throw 'AppVersion not found in src/5kableSplit.ahk' }
+          $v = [regex]::Match((Get-Content src/Wideside.ahk -Raw), 'AppVersion := "([^"]+)"').Groups[1].Value
+          if (-not $v) { throw 'AppVersion not found in src/Wideside.ahk' }
           "version=$v" >> $env:GITHUB_OUTPUT
       - name: Build
         shell: pwsh
@@ -40,17 +40,17 @@ jobs:
       - name: Add latest-version aliases
         shell: pwsh
         run: |
-          Copy-Item (Get-ChildItem dist/5kableSplit-Setup-*.exe).FullName dist/5kableSplit-Setup.exe
-          Copy-Item (Get-ChildItem dist/5kableSplit-*-portable.zip).FullName dist/5kableSplit-portable.zip
+          Copy-Item (Get-ChildItem dist/Wideside-Setup-*.exe).FullName dist/Wideside-Setup.exe
+          Copy-Item (Get-ChildItem dist/Wideside-*-portable.zip).FullName dist/Wideside-portable.zip
       - uses: actions/upload-artifact@v4
         with:
-          name: 5kable-Split
+          name: Wideside
           path: dist/*
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.ver.outputs.version }}
           target_commitish: ${{ github.sha }}
-          name: 5kable Split ${{ steps.ver.outputs.version }}
+          name: Wideside ${{ steps.ver.outputs.version }}
           make_latest: true
           files: dist/*

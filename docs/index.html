@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Wideside · One big monitor, perfectly split</title>
+<meta name="description" content="Wideside is a free Windows app that splits an ultrawide or large monitor into window zones. Hold Shift, drag a window, drop it in. Like Dell Easy Arrange, for any monitor.">
+<meta property="og:title" content="Wideside · One big monitor, perfectly split">
+<meta property="og:description" content="Free Windows app that splits an ultrawide or large monitor into window zones, like Dell Easy Arrange.">
+<meta property="og:image" content="https://crxigzah.github.io/wideside/og.png">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="theme-color" content="#101114">
+<link rel="icon" href="logo.svg" type="image/svg+xml">
+<link rel="icon" href="favicon-32.png" sizes="32x32" type="image/png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #101114;
+  --bg2: #15161a;
+  --card: #1a1c21;
+  --border: #2a2d35;
+  --text: #f4f4f5;
+  --muted: #9a9da8;
+  --accent: #ff7a3d;
+  --accent-hi: #ffa24a;
+  --accent-lo: #ff5a36;
+  --on-accent: #1a0d06;
+  --zone: rgba(255,255,255,0.04);
+  --zone-border: rgba(255,122,61,0.28);
+  --shadow: 0 30px 80px rgba(0,0,0,0.55);
+}
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #fbfaf8;
+    --bg2: #f3f1ed;
+    --card: #ffffff;
+    --border: #e6e2db;
+    --text: #18181b;
+    --muted: #63636e;
+    --accent: #f0611f;
+    --zone: rgba(0,0,0,0.035);
+    --zone-border: rgba(240,97,31,0.35);
+    --shadow: 0 30px 70px rgba(60,40,20,0.16);
+  }
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { background: var(--bg); color: var(--text); font-family: Inter, 'Segoe UI', system-ui, sans-serif; line-height: 1.6; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+h1, h2, h3, .brand { font-family: 'Space Grotesk', Inter, sans-serif; letter-spacing: -0.02em; }
+a { color: inherit; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+
+/* Nav */
+nav { position: sticky; top: 0; z-index: 10; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); background: color-mix(in srgb, var(--bg) 82%, transparent); border-bottom: 1px solid var(--border); }
+nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 64px; gap: 16px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 19px; text-decoration: none; }
+.brand img { width: 30px; height: 30px; }
+.nav-links { display: flex; align-items: center; gap: 26px; font-size: 14px; color: var(--muted); }
+.nav-links a { text-decoration: none; transition: color .15s; }
+.nav-links a:hover { color: var(--text); }
+.btn { display: inline-flex; align-items: center; gap: 10px; font-weight: 600; text-decoration: none; border-radius: 12px; transition: transform .15s, box-shadow .15s, background .15s; }
+.btn-primary { background: linear-gradient(135deg, var(--accent-hi), var(--accent-lo)); color: var(--on-accent); padding: 14px 26px; font-size: 15px; box-shadow: 0 8px 24px rgba(255,90,54,0.25); }
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 14px 34px rgba(255,90,54,0.35); }
+.btn-small { padding: 8px 16px; font-size: 13px; border-radius: 10px; }
+.btn-ghost { color: var(--muted); padding: 14px 8px; font-size: 14px; }
+.btn-ghost:hover { color: var(--text); }
+
+/* Hero */
+.hero { position: relative; padding: 96px 0 72px; overflow: hidden; }
+.hero::before { content: ''; position: absolute; inset: -20% -10% auto; height: 640px; background: radial-gradient(ellipse 50% 45% at 70% 30%, rgba(255,122,61,0.16), transparent 70%); pointer-events: none; }
+.hero .wrap { display: grid; grid-template-columns: 1fr 1.05fr; gap: 64px; align-items: center; position: relative; }
+.pill { display: inline-flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent); padding: 5px 12px; border-radius: 999px; margin-bottom: 22px; }
+.hero h1 { font-size: clamp(40px, 6vw, 64px); line-height: 1.02; font-weight: 700; margin-bottom: 20px; }
+.hero h1 em { font-style: normal; background: linear-gradient(135deg, var(--accent-hi), var(--accent-lo)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.hero p.lead { font-size: 18px; color: var(--muted); max-width: 460px; margin-bottom: 32px; }
+.actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.meta { font-size: 13px; color: var(--muted); margin-top: 14px; }
+
+/* Monitor mock-up */
+.monitor { width: 100%; max-width: 560px; margin: 0 auto; }
+.screen { position: relative; aspect-ratio: 21 / 9; background: var(--bg2); border: 3px solid var(--border); border-radius: 16px 16px 8px 8px; box-shadow: var(--shadow); padding: 10px; display: flex; gap: 10px; overflow: hidden; }
+.zone { flex: 1; border-radius: 9px; background: var(--zone); border: 1.5px dashed var(--zone-border); display: flex; align-items: center; justify-content: center; font: 700 32px 'Space Grotesk', sans-serif; color: color-mix(in srgb, var(--accent) 55%, transparent); transition: background .3s, color .3s, border-color .3s; }
+.zone.hot { background: linear-gradient(135deg, var(--accent-hi), var(--accent-lo)); color: var(--on-accent); border-color: transparent; }
+.win { position: absolute; top: 10px; bottom: 10px; border-radius: 9px; background: var(--card); border: 1px solid var(--border); box-shadow: 0 12px 32px rgba(0,0,0,0.35); overflow: hidden; transition: left .55s cubic-bezier(.2,.8,.2,1), width .55s cubic-bezier(.2,.8,.2,1), top .55s, bottom .55s; }
+.win-bar { height: 16px; background: var(--bg2); border-bottom: 1px solid var(--border); display: flex; gap: 5px; align-items: center; padding: 0 7px; }
+.win-bar i { width: 6px; height: 6px; border-radius: 50%; background: var(--border); }
+.win-body { padding: 10px; }
+.win-body b { display: block; height: 6px; border-radius: 3px; background: var(--border); margin-bottom: 7px; }
+.stand { width: 20%; height: 30px; margin: 0 auto; background: var(--border); clip-path: polygon(32% 0, 68% 0, 82% 100%, 18% 100%); }
+.base { width: 38%; height: 7px; margin: 0 auto; background: var(--border); border-radius: 4px; }
+.caption { text-align: center; font-size: 13px; color: var(--muted); margin-top: 16px; min-height: 22px; }
+kbd { font: 600 11.5px Inter, sans-serif; color: var(--text); background: var(--card); border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 6px; padding: 2px 7px; }
+
+/* Sections */
+section { padding: 80px 0; }
+.section-head { text-align: center; max-width: 560px; margin: 0 auto 44px; }
+.eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+.section-head h2 { font-size: clamp(28px, 4vw, 40px); line-height: 1.1; margin-bottom: 12px; }
+.section-head p { color: var(--muted); font-size: 16px; }
+
+.features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 24px; transition: border-color .2s, transform .2s; }
+.card:hover { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); transform: translateY(-3px); }
+.card .icon { width: 40px; height: 40px; border-radius: 11px; display: flex; align-items: center; justify-content: center; background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--accent); margin-bottom: 16px; }
+.card h3 { font-size: 17px; margin-bottom: 6px; }
+.card p { font-size: 14px; color: var(--muted); }
+
+.layouts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.layout { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 14px; }
+.layout-prev { position: relative; aspect-ratio: 21 / 9; background: var(--bg2); border-radius: 7px; margin-bottom: 10px; }
+.layout-prev span { position: absolute; border-radius: 4px; background: linear-gradient(135deg, var(--accent-hi), var(--accent-lo)); display: flex; align-items: center; justify-content: center; font: 700 11px 'Space Grotesk', sans-serif; color: var(--on-accent); }
+.layout h3 { font-size: 13.5px; font-family: Inter, sans-serif; letter-spacing: 0; font-weight: 600; }
+.layout.custom { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; border-style: dashed; color: var(--muted); font-size: 13px; }
+.layout.custom strong { color: var(--text); font-size: 14px; margin-bottom: 4px; }
+
+.keys { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; max-width: 860px; margin: 0 auto; }
+.key { display: flex; justify-content: space-between; align-items: center; gap: 16px; background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 14px 18px; font-size: 14px; }
+.key > span:first-child { white-space: nowrap; display: flex; gap: 4px; align-items: center; }
+.key > span:last-child { color: var(--muted); text-align: right; font-size: 13.5px; }
+
+.faq { max-width: 760px; margin: 0 auto; display: grid; gap: 10px; }
+details { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 0 20px; transition: border-color .2s; }
+details[open] { border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
+summary { cursor: pointer; list-style: none; padding: 18px 0; font-weight: 600; display: flex; justify-content: space-between; gap: 16px; }
+summary::-webkit-details-marker { display: none; }
+summary::after { content: '+'; color: var(--accent); font-size: 20px; line-height: 1; transition: transform .2s; }
+details[open] summary::after { transform: rotate(45deg); }
+details p { color: var(--muted); font-size: 14.5px; padding-bottom: 18px; }
+details a { color: var(--accent); }
+
+.cta { text-align: center; background: linear-gradient(135deg, color-mix(in srgb, var(--accent-hi) 14%, var(--card)), var(--card)); border: 1px solid var(--border); border-radius: 24px; padding: 56px 24px; }
+.cta img { width: 64px; height: 64px; margin-bottom: 18px; }
+.cta h2 { font-size: clamp(26px, 4vw, 36px); margin-bottom: 10px; }
+.cta p { color: var(--muted); margin-bottom: 26px; }
+
+footer { border-top: 1px solid var(--border); padding: 32px 0; font-size: 13px; color: var(--muted); }
+footer .wrap { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+footer nav { position: static; background: none; border: 0; backdrop-filter: none; display: flex; gap: 20px; }
+footer a { text-decoration: none; }
+footer a:hover { color: var(--text); }
+
+@media (max-width: 900px) {
+  .hero { padding: 56px 0 40px; }
+  .hero .wrap { grid-template-columns: 1fr; gap: 44px; text-align: center; }
+  .hero p.lead { margin-left: auto; margin-right: auto; }
+  .actions { justify-content: center; }
+  .features { grid-template-columns: 1fr 1fr; }
+  .layouts { grid-template-columns: 1fr 1fr; }
+  .keys { grid-template-columns: 1fr; }
+  .nav-links a:not(.btn) { display: none; }
+  section { padding: 56px 0; }
+}
+@media (max-width: 560px) {
+  .wrap { padding: 0 16px; }
+  .features { grid-template-columns: 1fr; }
+  .key { flex-direction: column; align-items: flex-start; gap: 6px; }
+  .key > span:last-child { text-align: left; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .win, .zone, .card, .btn { transition: none; }
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="wrap">
+    <a class="brand" href="#"><img src="logo.svg" alt="">Wideside</a>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#layouts">Layouts</a>
+      <a href="#hotkeys">Hotkeys</a>
+      <a href="#faq">FAQ</a>
+      <a href="https://github.com/crxigzah/wideside">GitHub</a>
+      <a class="btn btn-primary btn-small" href="https://github.com/crxigzah/wideside/releases/latest/download/Wideside-Setup.exe">Download</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <div>
+      <div class="pill">Free for Windows 10 &amp; 11</div>
+      <h1>One big monitor,<br><em>perfectly split.</em></h1>
+      <p class="lead">Wideside snaps windows into side-by-side zones on ultrawide and large monitors. Hold Shift, drag a window, drop it in. Like Dell Easy Arrange, for any screen.</p>
+      <div class="actions">
+        <a class="btn btn-primary" id="download" href="https://github.com/crxigzah/wideside/releases/latest/download/Wideside-Setup.exe">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.5 10.5 4.5v7H3zM11.5 4.4 21 3v8.5h-9.5zM3 12.5h7.5v7L3 18.5zM11.5 12.5H21V21l-9.5-1.4z"/></svg>
+          Download for Windows
+        </a>
+        <a class="btn btn-ghost" href="https://github.com/crxigzah/wideside/releases/latest/download/Wideside-portable.zip">or get the portable .zip</a>
+      </div>
+      <div class="meta" id="meta">Free · No account · No ads</div>
+    </div>
+
+    <div class="monitor" aria-hidden="true">
+      <div class="screen" id="screen">
+        <div class="zone">1</div>
+        <div class="zone">2</div>
+        <div class="win" id="win">
+          <div class="win-bar"><i></i><i></i><i></i></div>
+          <div class="win-body"><b style="width:68%"></b><b style="width:92%"></b><b style="width:54%"></b><b style="width:80%"></b></div>
+        </div>
+      </div>
+      <div class="stand"></div>
+      <div class="base"></div>
+      <div class="caption" id="caption">Hold <kbd>Shift</kbd> and drag</div>
+    </div>
+  </div>
+</header>
+
+<section id="features">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">Features</div>
+      <h2>Two monitors' worth of space. One screen.</h2>
+      <p>Big monitors are great until you're dragging windows around by hand. Wideside gives every window a place to land.</p>
+    </div>
+    <div class="features">
+      <div class="card">
+        <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3M2 12h20M12 2v20"/></svg></div>
+        <h3>Drag to snap</h3>
+        <p>Hold Shift while dragging and the zones appear. The one under your mouse lights up; let go and the window fills it exactly.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/></svg></div>
+        <h3>Keyboard shortcuts</h3>
+        <p>Win + Alt + arrows moves windows between zones. Win + Alt + a number sends one straight to a zone.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="18" rx="1.5"/><rect x="14" y="3" width="7" height="8" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></div>
+        <h3>Layouts that fit</h3>
+        <p>Halves, thirds, a focus column, stacked or quarters. Switch with one shortcut, or define your own.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 3H3v18h18zM3 9h18M9 21V9"/></svg></div>
+        <h3>Pixel-perfect edges</h3>
+        <p>Allows for Windows 11's invisible window borders and display scaling, so windows line up with even gaps.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="13" height="10" rx="1.5"/><rect x="17" y="8" width="5" height="10" rx="1"/><path d="M6 18h5"/></svg></div>
+        <h3>Any monitor</h3>
+        <p>Built for ultrawides like the MSI MAG C42CQR E2, but it reads your resolution and taskbar, and works across multiple screens.</p>
+      </div>
+      <div class="card">
+        <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9z"/></svg></div>
+        <h3>Tiny and quiet</h3>
+        <p>A 1.5 MB tray app with no account, no telemetry and no admin rights needed to install.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="layouts" style="background:var(--bg2);">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">Layouts</div>
+      <h2>Split it your way</h2>
+      <p>Seven layouts built in, each with an adjustable gap. Pick one from the tray, or press Win + Alt + L to cycle through them.</p>
+    </div>
+    <div class="layouts" id="layout-grid"></div>
+  </div>
+</section>
+
+<section id="hotkeys">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">Hotkeys</div>
+      <h2>Hands stay on the keyboard</h2>
+    </div>
+    <div class="keys">
+      <div class="key"><span><kbd>Shift</kbd> + drag</span><span>Show zones, drop to snap</span></div>
+      <div class="key"><span><kbd>Win</kbd><kbd>Alt</kbd><kbd>←</kbd><kbd>→</kbd></span><span>Previous / next zone</span></div>
+      <div class="key"><span><kbd>Win</kbd><kbd>Alt</kbd><kbd>1</kbd> to <kbd>9</kbd></span><span>Snap to zone number</span></div>
+      <div class="key"><span><kbd>Win</kbd><kbd>Alt</kbd><kbd>↑</kbd></span><span>Maximise across the screen</span></div>
+      <div class="key"><span><kbd>Win</kbd><kbd>Alt</kbd><kbd>L</kbd></span><span>Next layout</span></div>
+      <div class="key"><span><kbd>Win</kbd><kbd>Alt</kbd><kbd>Z</kbd></span><span>Show zone numbers</span></div>
+    </div>
+  </div>
+</section>
+
+<section id="faq" style="background:var(--bg2);">
+  <div class="wrap">
+    <div class="section-head">
+      <div class="eyebrow">FAQ</div>
+      <h2>Good to know</h2>
+    </div>
+    <div class="faq">
+      <details>
+        <summary>Does Windows see it as two monitors?</summary>
+        <p>No, and neither does Dell Easy Arrange. Wideside snaps windows into zones on one display, so maximised windows, full-screen games and full-screen video still use the whole panel. Use Shift + drag or Win + Alt + arrows instead of maximising.</p>
+      </details>
+      <details>
+        <summary>Why does Windows say "Windows protected your PC"?</summary>
+        <p>SmartScreen shows that for new apps that aren't code-signed yet. Click More info, then Run anyway. The full source code is on <a href="https://github.com/crxigzah/wideside">GitHub</a>, and every installer is built there automatically from that code.</p>
+      </details>
+      <details>
+        <summary>Can I make my own layouts?</summary>
+        <p>Yes. Open Settings from the tray icon, click "Edit custom layouts", add a line describing your zones, then choose Reload from the tray menu. There are examples in the file to copy.</p>
+      </details>
+      <details>
+        <summary>Does it work with multiple monitors?</summary>
+        <p>Yes. Zones are worked out for whichever monitor the window (or your mouse) is on, using that screen's own resolution, scaling and taskbar.</p>
+      </details>
+      <details>
+        <summary>Some windows won't move. Why?</summary>
+        <p>Apps running as administrator, such as Task Manager, can't be moved by a normal app. Run Wideside as administrator if you need those too. A few apps also have a minimum width and won't shrink fully into a narrow zone.</p>
+      </details>
+      <details>
+        <summary>How do I uninstall it?</summary>
+        <p>Settings → Apps → Installed apps → Wideside → Uninstall. Your layout settings stay in %AppData%\Wideside in case you reinstall; delete that folder to remove them too.</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <div class="cta">
+      <img src="logo.svg" alt="">
+      <h2>Make the most of your big screen</h2>
+      <p>Free, small, and set up in under a minute.</p>
+      <a class="btn btn-primary" href="https://github.com/crxigzah/wideside/releases/latest/download/Wideside-Setup.exe">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.5 10.5 4.5v7H3zM11.5 4.4 21 3v8.5h-9.5zM3 12.5h7.5v7L3 18.5zM11.5 12.5H21V21l-9.5-1.4z"/></svg>
+        Download for Windows
+      </a>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <a class="brand" href="#" style="font-size:15px;"><img src="logo.svg" alt="" style="width:22px;height:22px;">Wideside</a>
+    <nav>
+      <a href="https://github.com/crxigzah/wideside">Source code</a>
+      <a href="https://github.com/crxigzah/wideside/releases">Releases</a>
+      <a href="https://github.com/crxigzah/wideside/issues">Report a problem</a>
+    </nav>
+    <span>© 2026 Wideside</span>
+  </div>
+</footer>
+
+<script>
+// Layout previews -- same zone data as the app's built-in layouts
+(function () {
+  const layouts = [
+    ['Two halves (50/50)',        [[0,0,.5,1],[.5,0,.5,1]]],
+    ['Wide left (60/40)',         [[0,0,.6,1],[.6,0,.4,1]]],
+    ['Wide right (40/60)',        [[0,0,.4,1],[.4,0,.6,1]]],
+    ['Three columns',             [[0,0,1/3,1],[1/3,0,1/3,1],[2/3,0,1/3,1]]],
+    ['Focus centre (25/50/25)',   [[0,0,.25,1],[.25,0,.5,1],[.75,0,.25,1]]],
+    ['Left half + right stacked', [[0,0,.5,1],[.5,0,.5,.5],[.5,.5,.5,.5]]],
+    ['Four quarters',             [[0,0,.5,.5],[.5,0,.5,.5],[0,.5,.5,.5],[.5,.5,.5,.5]]]
+  ];
+  const g = 3;
+  document.getElementById('layout-grid').innerHTML = layouts.map(([name, zones]) =>
+    '<div class="layout"><div class="layout-prev">' +
+    zones.map((z, i) =>
+      `<span style="left:calc(${z[0]*100}% + ${g}px);top:calc(${z[1]*100}% + ${g}px);width:calc(${z[2]*100}% - ${g*2}px);height:calc(${z[3]*100}% - ${g*2}px);">${i+1}</span>`
+    ).join('') + `</div><h3>${name}</h3></div>`
+  ).join('') + '<div class="layout custom"><strong>+ Your own</strong>Define any split you like</div>';
+})();
+
+// Hero animation: window drifts, a zone lights up, the window snaps -- loops
+(function () {
+  const screen = document.getElementById('screen');
+  const win = document.getElementById('win');
+  const cap = document.getElementById('caption');
+  const zones = screen.querySelectorAll('.zone');
+  const pad = 10;
+  function place(leftPct, widthPct, inset) {
+    win.style.left = `calc(${leftPct}% + ${pad + inset}px)`;
+    win.style.width = `calc(${widthPct}% - ${pad * 1.5 + inset * 2}px)`;
+    win.style.top = (pad + inset) + 'px';
+    win.style.bottom = (pad + inset) + 'px';
+  }
+  function hot(i) { zones.forEach((z, j) => z.classList.toggle('hot', j === i)); }
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    place(0, 50, 0);
+    cap.innerHTML = 'Hold <kbd>Shift</kbd>, drag, and drop into a zone';
+    return;
+  }
+  const steps = [
+    () => { hot(-1); place(28, 36, 22); cap.innerHTML = 'Hold <kbd>Shift</kbd> and drag'; },
+    () => { hot(1); place(46, 36, 18); cap.innerHTML = 'Zone 2 lights up'; },
+    () => { hot(-1); place(50, 50, 0); cap.innerHTML = 'Let go to snap'; },
+    () => { cap.innerHTML = '<kbd>Win</kbd> <kbd>Alt</kbd> <kbd>←</kbd> to move it'; },
+    () => { place(0, 50, 0); cap.innerHTML = 'Snapped to zone 1'; }
+  ];
+  let i = 0;
+  steps[0]();
+  setInterval(() => { i = (i + 1) % steps.length; steps[i](); }, 1600);
+})();
+
+// Current version and size from the latest release. Cosmetic only --
+// the download buttons work without it.
+fetch('https://api.github.com/repos/crxigzah/wideside/releases/latest')
+  .then(r => r.ok ? r.json() : null)
+  .then(rel => {
+    if (!rel) return;
+    const setup = (rel.assets || []).find(a => a.name === 'Wideside-Setup.exe');
+    const size = setup ? ` · ${(setup.size / 1048576).toFixed(1)} MB` : '';
+    document.getElementById('meta').textContent =
+      `Version ${rel.tag_name.replace(/^v/, '')}${size} · Free · No account · No ads`;
+  })
+  .catch(() => {});
+</script>
+</body>
+</html>

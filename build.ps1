@@ -1,4 +1,4 @@
-# Builds dist\5kableSplit.exe, a portable zip and the installer.
+# Builds dist\Wideside.exe, a portable zip and the installer.
 # Downloads AutoHotkey v2 and Ahk2Exe into .\tools the first time, and installs
 # Inno Setup with winget (or Chocolatey) if it isn't already installed.
 # Works in Windows PowerShell 5.1 and PowerShell 7.
@@ -10,15 +10,15 @@ $ProgressPreference = 'SilentlyContinue'
 $Root  = $PSScriptRoot
 $Tools = Join-Path $Root 'tools'
 $Dist  = Join-Path $Root 'dist'
-$Src   = Join-Path $Root 'src\5kableSplit.ahk'
+$Src   = Join-Path $Root 'src\Wideside.ahk'
 New-Item -ItemType Directory -Force -Path $Tools, $Dist | Out-Null
 
 $Version = [regex]::Match((Get-Content $Src -Raw), 'AppVersion := "([^"]+)"').Groups[1].Value
-if (-not $Version) { throw 'Could not read AppVersion from src\5kableSplit.ahk' }
-Write-Host "Building 5kable Split $Version" -ForegroundColor Cyan
+if (-not $Version) { throw 'Could not read AppVersion from src\Wideside.ahk' }
+Write-Host "Building Wideside $Version" -ForegroundColor Cyan
 
 # GitHub API headers; a token (set automatically in GitHub Actions) avoids rate limits
-$GhHeaders = @{ 'User-Agent' = '5kable-Split-build' }
+$GhHeaders = @{ 'User-Agent' = 'Wideside-build' }
 if ($env:GITHUB_TOKEN) { $GhHeaders['Authorization'] = "Bearer $env:GITHUB_TOKEN" }
 
 function Get-Zip($Url, $Dest) {
@@ -71,15 +71,15 @@ Write-Host "  exit code $($v.ExitCode)"
 if ($v.ExitCode -ne 0) { throw "Script has errors:`n$(Get-Content $errLog -Raw)" }
 
 # 4. Compile the exe (icon and version info come from the ;@Ahk2Exe lines in the script)
-$Exe = Join-Path $Dist '5kableSplit.exe'
+$Exe = Join-Path $Dist 'Wideside.exe'
 Remove-Item $Exe -ErrorAction SilentlyContinue
-Write-Host 'Compiling 5kableSplit.exe...'
+Write-Host 'Compiling Wideside.exe...'
 $p = Start-Process $Ahk2Exe -Wait -PassThru -ArgumentList @(
     '/in', "`"$Src`"", '/out', "`"$Exe`"", '/base', "`"$AhkBase`"", '/silent', 'verbose')
 if ($p.ExitCode -ne 0 -or -not (Test-Path $Exe)) { throw "Ahk2Exe failed (exit code $($p.ExitCode))" }
 
 # 5. Portable zip
-$Portable = Join-Path $Dist "5kableSplit-$Version-portable.zip"
+$Portable = Join-Path $Dist "Wideside-$Version-portable.zip"
 Remove-Item $Portable -ErrorAction SilentlyContinue
 Compress-Archive -Path $Exe -DestinationPath $Portable
 
@@ -112,7 +112,7 @@ if (-not $Iscc) {
 }
 
 Write-Host 'Building installer...'
-& $Iscc "/DAppVersion=$Version" /Qp (Join-Path $Root 'installer\5kableSplit.iss')
+& $Iscc "/DAppVersion=$Version" /Qp (Join-Path $Root 'installer\Wideside.iss')
 if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed (exit code $LASTEXITCODE)" }
 
 Write-Host ''

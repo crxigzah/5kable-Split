@@ -1,21 +1,21 @@
-; Inno Setup script for 5kable Split. build.ps1 runs this; it can also be
-; opened directly in the Inno Setup Compiler once dist\5kableSplit.exe exists.
+; Inno Setup script for Wideside. build.ps1 runs this; it can also be
+; opened directly in the Inno Setup Compiler once dist\Wideside.exe exists.
 
 #ifndef AppVersion
-  #define AppVersion "1.0.0"
+  #define AppVersion "1.1.0"
 #endif
-#define AppName "5kable Split"
-#define AppExe "5kableSplit.exe"
+#define AppName "Wideside"
+#define AppExe "Wideside.exe"
 
 [Setup]
-AppId={{6F3B0C2E-5A1D-4C7B-9E2A-5B1E0D7C4A51}
+AppId={{C2A7E5D1-8B3F-4E62-A9D4-7F1B6E0C3A92}
 AppName={#AppName}
 AppVersion={#AppVersion}
 AppVerName={#AppName} {#AppVersion}
-AppPublisher=5kable
-AppPublisherURL=https://5kable.net
-AppSupportURL=https://5kable.net
-AppCopyright=Copyright 2026 5kable
+AppPublisher=Wideside
+AppPublisherURL=https://crxigzah.github.io/wideside/
+AppSupportURL=https://crxigzah.github.io/wideside/
+AppCopyright=Copyright 2026 Wideside
 VersionInfoVersion={#AppVersion}
 VersionInfoProductName={#AppName}
 DefaultDirName={autopf}\{#AppName}
@@ -27,7 +27,7 @@ PrivilegesRequiredOverridesAllowed=dialog
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=..\dist
-OutputBaseFilename=5kableSplit-Setup-{#AppVersion}
+OutputBaseFilename=Wideside-Setup-{#AppVersion}
 SetupIconFile=..\src\app.ico
 UninstallDisplayIcon={app}\{#AppExe}
 UninstallDisplayName={#AppName}
@@ -41,10 +41,10 @@ SolidCompression=yes
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Messages]
-WelcomeLabel2=This will install [name/ver] on your computer.%n%n5kable Split splits a big monitor into zones, so windows snap side by side like a multi-monitor setup.%n%nClose other applications before continuing.
+WelcomeLabel2=This will install [name/ver] on your computer.%n%nWideside splits a big monitor into zones, so windows snap side by side like a multi-monitor setup.%n%nClose other applications before continuing.
 
 [Tasks]
-Name: "startup"; Description: "Start 5kable Split when Windows starts"; GroupDescription: "Startup:"
+Name: "startup"; Description: "Start Wideside when Windows starts"; GroupDescription: "Startup:"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]

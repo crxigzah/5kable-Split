@@ -1,17 +1,17 @@
-; 5kable Split - Easy Arrange style window zones for big / ultrawide monitors
+; Wideside - Easy Arrange style window zones for big / ultrawide monitors
 ; Built for the MSI MAG C42CQR E2 but works on any monitor (it reads the
 ; resolution and taskbar position from Windows at runtime).
 ;
 ; Requires AutoHotkey v2 to run from source. build.cmd compiles it to an .exe
 ; and wraps it in an installer.
 
-;@Ahk2Exe-SetName 5kable Split
-;@Ahk2Exe-SetProductName 5kable Split
-;@Ahk2Exe-SetDescription 5kable Split
-;@Ahk2Exe-SetVersion 1.0.0
-;@Ahk2Exe-SetCompanyName 5kable
-;@Ahk2Exe-SetCopyright Copyright 2026 5kable
-;@Ahk2Exe-SetOrigFilename 5kableSplit.exe
+;@Ahk2Exe-SetName Wideside
+;@Ahk2Exe-SetProductName Wideside
+;@Ahk2Exe-SetDescription Wideside
+;@Ahk2Exe-SetVersion 1.1.0
+;@Ahk2Exe-SetCompanyName Wideside
+;@Ahk2Exe-SetCopyright Copyright 2026 Wideside
+;@Ahk2Exe-SetOrigFilename Wideside.exe
 ;@Ahk2Exe-SetMainIcon app.ico
 
 #Requires AutoHotkey v2.0
@@ -23,18 +23,18 @@ Persistent
 DllCall("SetThreadDpiAwarenessContext", "ptr", -4, "ptr")
 CoordMode "Mouse", "Screen"
 
-global AppName := "5kable Split"
-global AppVersion := "1.0.0"
-global AppUrl := "https://5kable.net"
+global AppName := "Wideside"
+global AppVersion := "1.1.0"
+global AppUrl := "https://crxigzah.github.io/wideside/"
 
 ; Settings live in %AppData% so it works when installed to Program Files.
-global DataDir := A_AppData "\5kable Split"
+global DataDir := A_AppData "\Wideside"
 global IniFile := DataDir "\settings.ini"
 global LogoFile := DataDir "\logo.png"
 
-; 5kable palette
-global C_Bg := "0D0D18", C_Card := "1E1E35", C_Teal := "00C9A7"
-global C_Text := "FFFFFF", C_Muted := "8888AA"
+; Wideside palette
+global C_Bg := "101114", C_Card := "1C1E25", C_Accent := "FF7A3D"
+global C_Text := "F4F4F5", C_Muted := "9A9DA8"
 
 ; Zones are [x, y, width, height] as fractions of the screen's work area.
 global BuiltInLayouts := [
@@ -344,7 +344,7 @@ ShowOverlay(mon, hi) {
             r := ZoneRect(mon, z)
             g := Gui("+AlwaysOnTop -Caption +ToolWindow +E0x20 -DPIScale")
             g.BackColor := C_Card
-            g.SetFont("s48 bold c" C_Teal, "Segoe UI")
+            g.SetFont("s48 bold c" C_Accent, "Segoe UI")
             label := g.AddText("x0 y" (r.h // 2 - 45) " w" r.w " h90 Center BackgroundTrans", i)
             g.Show("NA x" r.x " y" r.y " w" r.w " h" r.h)
             WinSetTransparent 150, g
@@ -354,8 +354,8 @@ ShowOverlay(mon, hi) {
     }
     if hi != OverlayHi {
         for i, o in Overlays {
-            o.gui.BackColor := (i = hi) ? C_Teal : C_Card
-            o.label.SetFont("c" ((i = hi) ? C_Bg : C_Teal))
+            o.gui.BackColor := (i = hi) ? C_Accent : C_Card
+            o.label.SetFont("c" ((i = hi) ? C_Bg : C_Accent))
             WinRedraw o.gui
         }
         OverlayHi := hi
@@ -423,7 +423,7 @@ EditCustomLayouts(*) {
 
 ; ---------------------------------------------------------------- branded windows
 
-; Dark 5kable-styled window with a dark title bar on Windows 10/11.
+; Dark Wideside-styled window with a dark title bar on Windows 10/11.
 NewBrandedGui(title) {
     g := Gui("-MinimizeBox -MaximizeBox", title)
     g.BackColor := C_Bg
@@ -431,7 +431,7 @@ NewBrandedGui(title) {
     g.SetFont("s10 c" C_Text, "Segoe UI")
     hwnd := g.Hwnd
     DllCall("dwmapi\DwmSetWindowAttribute", "ptr", hwnd, "uint", 20, "int*", 1, "uint", 4)      ; dark mode
-    DllCall("dwmapi\DwmSetWindowAttribute", "ptr", hwnd, "uint", 35, "uint*", 0x180D0D, "uint", 4) ; caption #0d0d18
+    DllCall("dwmapi\DwmSetWindowAttribute", "ptr", hwnd, "uint", 35, "uint*", 0x141110, "uint", 4) ; caption #101114
     return g
 }
 
@@ -439,19 +439,17 @@ AddHeader(g, subtitle, w) {
     if FileExist(LogoFile)
         g.AddPicture("x24 y20 w56 h56", LogoFile)
     g.SetFont("s18 bold c" C_Text)
-    g.AddText("x96 y22 BackgroundTrans", "5kable")
-    g.SetFont("s18 bold c" C_Teal)
-    g.AddText("x+0 yp BackgroundTrans", " Split")
+    g.AddText("x96 y22 BackgroundTrans", "Wideside")
     g.SetFont("s9 norm c" C_Muted)
     g.AddText("x96 y56 w" (w - 96) " BackgroundTrans", subtitle)
     g.AddText("x24 y92 w" (w - 24) " h1 Background" C_Card)
     g.SetFont("s10 norm c" C_Text)
 }
 
-; Flat teal button (normal buttons can't be recoloured)
+; Flat accent-coloured button (normal buttons can't be recoloured)
 AddButton(g, opts, label, callback, primary := true) {
     g.SetFont("s10 bold c" (primary ? C_Bg : C_Text))
-    b := g.AddText(opts " h34 Center +0x200 Background" (primary ? C_Teal : C_Card), label)
+    b := g.AddText(opts " h34 Center +0x200 Background" (primary ? C_Accent : C_Card), label)
     b.OnEvent("Click", callback)
     g.SetFont("s10 norm c" C_Text)
     return b
@@ -481,7 +479,7 @@ ShowAbout(welcome := false, *) {
     y := 108
     if welcome {
         g.SetFont("s10 c" C_Text)
-        g.AddText("x24 y" y " w" (W - 24), "5kable Split is running in your system tray (bottom right, next to the clock). Drag any window while holding Shift and drop it on a zone.")
+        g.AddText("x24 y" y " w" (W - 24), "Wideside is running in your system tray (bottom right, next to the clock). Drag any window while holding Shift and drop it on a zone.")
         y += 60
     }
 
@@ -494,7 +492,7 @@ ShowAbout(welcome := false, *) {
         ["Win+Alt+Z",          "Show zones"]
     ]
     for k in keys {
-        g.SetFont("s10 bold c" C_Teal)
+        g.SetFont("s10 bold c" C_Accent)
         g.AddText("x24 y" y " w170", k[1])
         g.SetFont("s10 norm c" C_Text)
         g.AddText("x200 y" y " w" (W - 200), k[2])
@@ -503,7 +501,7 @@ ShowAbout(welcome := false, *) {
 
     y += 14
     g.SetFont("s9 c" C_Muted)
-    link := g.AddText("x24 y" (y + 8) " w200", "5kable.net")
+    link := g.AddText("x24 y" (y + 8) " w200", "Website")
     link.OnEvent("Click", (*) => Run(AppUrl))
     AddButton(g, "x" (W - 236) " y" y " w120", "Settings", (*) => (CloseAbout(), ShowSettings()), false)
     AddButton(g, "x" (W - 104) " y" y " w120", welcome ? "Got it" : "Close", CloseAbout)
@@ -555,7 +553,7 @@ ShowSettings(*) {
     PreviewZonesCtl := []
     g.SetFont("s14 bold c" C_Bg)
     Loop 12
-        PreviewZonesCtl.Push(g.AddText("x" px " y" py " w10 h10 Hidden Center +0x200 Background" C_Teal, A_Index))
+        PreviewZonesCtl.Push(g.AddText("x" px " y" py " w10 h10 Hidden Center +0x200 Background" C_Accent, A_Index))
     g.SetFont("s10 norm c" C_Text)
 
     y := py + PrevH + 22
@@ -574,10 +572,10 @@ ShowSettings(*) {
 
     y += 68
     AddToggle(g, y, "Only snap when holding Shift while dragging", RequireShift, SetRequireShift)
-    AddToggle(g, y + 28, "Start 5kable Split with Windows", FileExist(StartupLink()) != "", SetStartup)
+    AddToggle(g, y + 28, "Start Wideside with Windows", FileExist(StartupLink()) != "", SetStartup)
 
     y += 72
-    g.SetFont("s9 c" C_Teal)
+    g.SetFont("s9 c" C_Accent)
     custom := g.AddText("x24 y" (y + 8) " w220", "Edit custom layouts...")
     custom.OnEvent("Click", EditCustomLayouts)
     AddButton(g, "x" (W - 104) " y" y " w120", "Done", CloseSettings)
